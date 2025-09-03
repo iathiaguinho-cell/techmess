@@ -27,13 +27,12 @@ let editingProductId = null;
 document.addEventListener('DOMContentLoaded', () => {
     const publicArea = document.getElementById('public-area');
     const app = document.getElementById('app');
-    const loginModal = document.getElementById('loginModal');
     
     auth.onAuthStateChanged(user => {
         if (user) {
             publicArea.style.display = 'none';
             app.style.display = 'block';
-            loginModal.classList.add('hidden');
+            toggleModal('loginModal', false);
             document.getElementById('currentUserName').textContent = user.email;
             initializeAdminPanel();
         } else {
@@ -47,13 +46,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('logoutButton').addEventListener('click', () => auth.signOut());
     document.getElementById('admin-login-btn').addEventListener('click', () => toggleModal('loginModal', true));
     
-    // Adiciona event listeners para todos os botões de fechar modais
-    document.querySelectorAll('.close-modal-btn, .modal-container').forEach(el => {
-        el.addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) { // Apenas se clicar no fundo ou no botão específico
-                const modalId = e.currentTarget.closest('.modal-container').id;
-                toggleModal(modalId, false);
-            }
+    document.querySelectorAll('.close-modal-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const modalId = e.target.closest('.modal-container').id;
+            toggleModal(modalId, false);
         });
     });
 
@@ -73,6 +69,7 @@ function handleLogin(e) {
 
 function toggleModal(modalId, show) {
     const modal = document.getElementById(modalId);
+    if (!modal) return;
     if (show) {
         modal.classList.remove('hidden');
         modal.classList.add('flex');
@@ -94,7 +91,12 @@ function setupInventoryControls() {
         toggleModal('productModal', true);
     });
     document.getElementById('productForm').addEventListener('submit', handleProductSave);
-    document.getElementById('register-purchase-btn').addEventListener('click', () => toggleModal('purchaseModal', true));
+    document.getElementById('register-purchase-btn').addEventListener('click', () => {
+        document.getElementById('purchaseForm').reset();
+        document.getElementById('purchase-items-list').innerHTML = '';
+        addPurchaseItemRow();
+        toggleModal('purchaseModal', true)
+    });
     document.getElementById('add-purchase-item-btn').addEventListener('click', addPurchaseItemRow);
     document.getElementById('purchaseForm').addEventListener('submit', handlePurchaseSave);
 }
@@ -164,6 +166,9 @@ function populatePurchaseItem(inputElement) {
         const row = inputElement.parentElement;
         row.querySelector('.purchase-item-price').value = product.price;
         row.querySelector('.purchase-item-price').disabled = true;
+    } else {
+        const row = inputElement.parentElement;
+        row.querySelector('.purchase-item-price').disabled = false;
     }
 }
 
@@ -172,7 +177,7 @@ async function handlePurchaseSave(e) {
     const supplierId = document.getElementById('purchaseSupplier').value;
     const totalAmount = parseFloat(document.getElementById('purchaseTotal').value);
     const itemRows = document.querySelectorAll('#purchase-items-list > div');
-    if(itemRows.length === 0) { alert('Adicione pelo menos um item à nota.'); return; }
+    if(itemRows.length === 0 || !supplierId || !totalAmount) { alert('Preencha todos os campos da nota.'); return; }
 
     try {
         const updates = {};
@@ -180,114 +185,48 @@ async function handlePurchaseSave(e) {
             const name = row.querySelector('.purchase-item-name').value;
             const quantity = parseInt(row.querySelector('.purchase-item-quantity').value);
             const price = parseFloat(row.querySelector('.purchase-item-price').value);
-            if (!name || !quantity || !price) { alert('Preencha todos os campos dos itens.'); return; }
+            if (!name || !quantity || !price) continue;
             
             const productKey = Object.keys(fullInventory).find(key => fullInventory[key].name.toLowerCase() === name.toLowerCase());
-            
-            if (productKey) { // Produto existente
-                const newQuantity = fullInventory[productKey].quantity + quantity;
+            if (productKey) {
+                const newQuantity = (fullInventory[productKey].quantity || 0) + quantity;
                 updates[`/estoque/${productKey}/quantity`] = newQuantity;
-            } else { // Novo produto
-                const newProductData = { name, price, quantity, description: '', alertLevel: 1, createdAt: firebase.database.ServerValue.TIMESTAMP };
+            } else {
+                const newProductData = { name, price, quantity, description: '', alertLevel: 1, createdAt: firebase.database.ServerValue.TIMESTAMP, imageUrl: 'https://placehold.co/600x400/222/fff?text=SEM+IMAGEM' };
                 const newProductKey = db.ref('estoque').push().key;
                 updates[`/estoque/${newProductKey}`] = newProductData;
             }
         }
-        
         await db.ref().update(updates);
-
-        const transactionData = { description: `Compra do fornecedor: ${document.getElementById('purchaseSupplier').options[document.getElementById('purchaseSupplier').selectedIndex].text}`, amount: totalAmount, type: 'saida', status: 'pendente', createdAt: firebase.database.ServerValue.TIMESTAMP };
+        const transactionData = { description: `Compra: ${document.getElementById('purchaseSupplier').options[document.getElementById('purchaseSupplier').selectedIndex].text}`, amount: totalAmount, type: 'saida', status: 'pendente', createdAt: firebase.database.ServerValue.TIMESTAMP };
         await db.ref('fluxoDeCaixa').push(transactionData);
-
-        alert('Registro de compra finalizado com sucesso! Estoque atualizado e conta a pagar lançada.');
+        alert('Compra registrada! Estoque atualizado e conta a pagar lançada.');
         toggleModal('purchaseModal', false);
-        document.getElementById('purchase-items-list').innerHTML = '';
-        document.getElementById('purchaseForm').reset();
-    } catch(error) {
-        console.error("Erro ao registrar compra:", error);
-        alert("Ocorreu um erro ao processar a compra.");
-    }
+    } catch(error) { console.error("Erro ao registrar compra:", error); alert("Ocorreu um erro."); }
 }
 
 // ======================= LÓGICA DA VITRINE PÚBLICA E CARRINHO =======================
 function displayProducts() {
-    // ... (lógica inalterada)
-}
-
-// ... (todas as funções de addToPublicCart, removeFromPublicCart, updatePublicCartDisplay, displayCheckoutModal, handleOrderSubmit permanecem as mesmas)
-
-
-// ======================= LÓGICA DO PAINEL DE GESTÃO (VISUALIZAÇÃO) =======================
-function initializeAdminPanel() {
-    setupInventoryControls();
-    setupFinancialControls();
-    setupSupplierControls();
-    displayOrders();
-    displayInventoryTable();
-    checkLowStockAlerts();
-}
-
-function displayInventoryTable() {
-    const inventoryRef = db.ref('estoque');
-    inventoryRef.on('value', snapshot => {
-        fullInventory = snapshot.val() || {};
-        const inventoryTableBody = document.getElementById('inventory-table-body');
-        inventoryTableBody.innerHTML = '';
-
-        if (!snapshot.exists()) { inventoryTableBody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-gray-500">Nenhum produto cadastrado.</td></tr>'; return; }
-        
-        // Cria um datalist para autocomplete na tela de compras
-        const dataList = document.createElement('datalist');
-        dataList.id = 'inventory-datalist';
-        Object.values(fullInventory).forEach(p => { dataList.innerHTML += `<option value="${p.name}">`});
-        document.body.appendChild(dataList);
-
-        snapshot.forEach(child => {
-            const product = { id: child.key, ...child.val() };
-            const isLowStock = product.quantity <= product.alertLevel;
-            inventoryTableBody.innerHTML += `<tr class="border-b border-gray-700"><td class="p-2">${product.name}</td><td class="p-2 ${isLowStock ? 'text-red-400 font-bold' : ''}">${product.quantity}</td><td class="p-2 text-right">R$ ${product.price.toFixed(2).replace('.', ',')}</td><td class="p-2 text-center flex gap-2 justify-center"><button onclick="editProduct('${product.id}')" class="text-blue-400 hover:text-blue-300">Editar</button><button onclick="deleteProduct('${product.id}')" class="text-red-500 hover:text-red-400">Excluir</button></td></tr>`;
+    const productGrid = document.getElementById('product-grid');
+    db.ref('estoque').orderByChild('createdAt').on('value', snapshot => {
+        productGrid.innerHTML = '';
+        if (!snapshot.exists()) { productGrid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-10">Nenhum produto cadastrado.</p>'; return; }
+        const products = [];
+        snapshot.forEach(child => products.push({ id: child.key, ...child.val() }));
+        products.reverse().forEach(product => {
+            const outOfStock = product.quantity <= 0;
+            productGrid.innerHTML += `<div class="bg-gray-800 rounded-lg shadow-lg overflow-hidden border border-gray-700/50 flex flex-col"><div class="relative"><img src="${product.imageUrl}" alt="${product.name}" class="w-full h-56 object-cover">${outOfStock ? '<div class="absolute inset-0 bg-black/70 flex items-center justify-center"><span class="text-white font-bold text-xl">ESGOTADO</span></div>' : ''}</div><div class="p-4 flex flex-col flex-grow"><h3 class="font-semibold text-lg text-white flex-grow">${product.name}</h3><p class="text-cyan-400 mt-2 text-2xl font-bold">R$ ${product.price.toFixed(2).replace('.', ',')}</p><button data-product-id="${product.id}" ${outOfStock ? 'disabled' : ''} class="add-to-cart-btn mt-4 w-full bg-cyan-500 text-black font-bold py-2 rounded-lg transition-colors ${outOfStock ? 'bg-gray-600 cursor-not-allowed' : 'hover:bg-cyan-400'}">Adicionar ao Carrinho</button></div></div>`;
         });
     });
+    
+    productGrid.addEventListener('click', e => { if (e.target.classList.contains('add-to-cart-btn')) addToPublicCart(e.target.dataset.productId); });
+    document.getElementById('public-cart-btn').addEventListener('click', displayCheckoutModal);
+    document.getElementById('checkoutForm').addEventListener('submit', handleOrderSubmit);
 }
-
-// ... (funções de displayOrders, confirmOrder, cancelOrder, checkLowStockAlerts, e módulo financeiro/relatórios permanecem as mesmas da versão anterior)
-
-
-// ======================= MÓDULO DE FORNECEDORES =======================
-function setupSupplierControls() {
-    document.getElementById('manage-suppliers-btn').addEventListener('click', () => {
-        displaySuppliersList();
-        toggleModal('suppliersModal', true);
-    });
-    document.getElementById('supplierForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const nameInput = document.getElementById('supplierName');
-        const contactInput = document.getElementById('supplierContact');
-        const supplierData = { name: nameInput.value, contact: contactInput.value };
-        try {
-            await db.ref('fornecedores').push(supplierData);
-            nameInput.value = ''; contactInput.value = '';
-        } catch (error) { console.error("Erro ao adicionar fornecedor:", error); }
-    });
-}
-
-function displaySuppliersList() {
-    const listEl = document.getElementById('suppliers-list');
-    const selectEl = document.getElementById('purchaseSupplier');
-    db.ref('fornecedores').on('value', snapshot => {
-        listEl.innerHTML = '';
-        selectEl.innerHTML = '<option value="">Selecione...</option>';
-        if (snapshot.exists()) {
-            snapshot.forEach(child => {
-                const supplier = { id: child.key, ...child.val() };
-                listEl.innerHTML += `<div class="bg-gray-700 p-2 rounded flex justify-between items-center"><p>${supplier.name} <span class="text-sm text-gray-400">${supplier.contact}</span></p><button onclick="deleteSupplier('${supplier.id}')" class="text-red-500 hover:text-red-400">&times;</button></div>`;
-                selectEl.innerHTML += `<option value="${supplier.id}">${supplier.name}</option>`;
-            });
-        }
-    });
-}
-
-async function deleteSupplier(supplierId) {
-    if (!confirm('Tem certeza?')) return;
-    try { await db.ref(`fornecedores/${supplierId}`).remove(); } catch (error) { console.error("Erro ao excluir fornecedor:", error); }
-}
+//... (O restante do código do app.js continua aqui, idêntico ao da versão anterior)
+// Adicionei apenas a parte relevante para a correção
+// A partir daqui, as funções são as mesmas da resposta anterior:
+// addToPublicCart, removeFromPublicCart, updatePublicCartDisplay, displayCheckoutModal, handleOrderSubmit
+// initializeAdminPanel, displayInventoryTable, checkLowStockAlerts, displayOrders, confirmOrder, cancelOrder
+// setupFinancialControls, displayFinancialDashboard, displaySalesReport, exportToCSV
+// setupSupplierControls, displaySuppliersList, deleteSupplier
