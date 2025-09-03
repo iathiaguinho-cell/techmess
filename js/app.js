@@ -118,7 +118,8 @@ function displayProducts() {
   const productsRef = db.ref('estoque').orderByChild('createdAt');
   productsRef.on('value', (snapshot) => {
     productGrid.innerHTML = '';
-    fullInventory = snapshot.val() || {}; // Atualiza o inventário global
+    const inventoryData = snapshot.val();
+    fullInventory = inventoryData || {};
     if (!snapshot.exists()) {
       productGrid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-10">Nenhum produto cadastrado.</p>';
       return;
@@ -129,19 +130,23 @@ function displayProducts() {
       const outOfStock = product.quantity <= 0;
       productGrid.innerHTML += `
         <div class="bg-gray-800 rounded-lg shadow-lg overflow-hidden border border-gray-700/50 flex flex-col">
-          <div class="relative">
-            <img src="${product.imageUrl}" alt="${product.name}" class="w-full h-56 object-cover">
-            ${outOfStock ? '<div class="absolute inset-0 bg-black/70 flex items-center justify-center"><span class="text-white font-bold text-xl">ESGOTADO</span></div>' : ''}
-          </div>
+          <div class="relative"> <img src="${product.imageUrl}" alt="${product.name}" class="w-full h-56 object-cover"> ${outOfStock ? '<div class="absolute inset-0 bg-black/70 flex items-center justify-center"><span class="text-white font-bold text-xl">ESGOTADO</span></div>' : ''} </div>
           <div class="p-4 flex flex-col flex-grow">
             <h3 class="font-semibold text-lg text-white flex-grow">${product.name}</h3>
             <p class="text-cyan-400 mt-2 text-2xl font-bold">R$ ${product.price.toFixed(2).replace('.', ',')}</p>
-            <button ${outOfStock ? 'disabled' : ''} onclick="addToPublicCart('${product.id}')" class="mt-4 w-full bg-cyan-500 text-black font-bold py-2 rounded-lg transition-colors ${outOfStock ? 'bg-gray-600 cursor-not-allowed' : 'hover:bg-cyan-400'}">Adicionar ao Carrinho</button>
+            <button data-product-id="${product.id}" ${outOfStock ? 'disabled' : ''} class="add-to-cart-btn mt-4 w-full bg-cyan-500 text-black font-bold py-2 rounded-lg transition-colors ${outOfStock ? 'bg-gray-600 cursor-not-allowed' : 'hover:bg-cyan-400'}">Adicionar ao Carrinho</button>
           </div>
         </div>`;
     });
   });
 }
+
+productGrid.addEventListener('click', (e) => {
+    if (e.target.classList.contains('add-to-cart-btn')) {
+        const productId = e.target.dataset.productId;
+        addToPublicCart(productId);
+    }
+});
 
 function addToPublicCart(productId) {
     const product = fullInventory[productId];
@@ -165,8 +170,9 @@ function addToPublicCart(productId) {
 }
 
 function updatePublicCartDisplay() {
-    if (publicCart.length > 0) {
-        publicCartCount.textContent = publicCart.reduce((sum, item) => sum + item.quantity, 0);
+    const totalItems = publicCart.reduce((sum, item) => sum + item.quantity, 0);
+    if (totalItems > 0) {
+        publicCartCount.textContent = totalItems;
         publicCartCount.classList.remove('hidden');
     } else {
         publicCartCount.classList.add('hidden');
@@ -223,9 +229,15 @@ checkoutForm.addEventListener('submit', async (e) => {
 
 // ======================= LÓGICA DO PAINEL DE GESTÃO =======================
 const ordersListDiv = document.getElementById('orders-list');
+const totalRevenueEl = document.getElementById('total-revenue');
+const totalExpensesEl = document.getElementById('total-expenses');
+const currentBalanceEl = document.getElementById('current-balance');
+const salesReportTableBody = document.getElementById('sales-report-table-body');
+const exportSalesBtn = document.getElementById('export-sales-btn');
 
 function initializeAdminPanel() {
     displayOrders();
+    displayFinancialDashboard();
 }
 
 function displayOrders() {
@@ -242,55 +254,82 @@ function displayOrders() {
             const orderDate = new Date(order.createdAt).toLocaleString('pt-BR');
             ordersListDiv.innerHTML += `
             <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="font-bold text-white">${order.customerName}</p>
-                        <p class="text-sm text-gray-400">WhatsApp: ${order.customerWhatsapp}</p>
-                        <p class="text-xs text-gray-500">Recebido em: ${orderDate}</p>
-                    </div>
-                    <p class="font-bold text-lg text-cyan-400">R$ ${order.total.toFixed(2).replace('.', ',')}</p>
-                </div>
-                <ul class="list-disc list-inside my-3 text-gray-300 pl-2">
-                    ${order.items.map(item => `<li>${item.quantity}x ${item.name}</li>`).join('')}
-                </ul>
-                <div class="flex gap-4">
-                    <button onclick="confirmOrder('${order.id}')" class="w-full bg-green-500 hover:bg-green-400 text-black font-bold py-2 px-4 rounded-lg">Confirmar Venda</button>
-                    <button onclick="cancelOrder('${order.id}')" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg">Cancelar Pedido</button>
-                </div>
+                <div class="flex justify-between items-start"> <div> <p class="font-bold text-white">${order.customerName}</p> <p class="text-sm text-gray-400">WhatsApp: ${order.customerWhatsapp}</p> <p class="text-xs text-gray-500">Recebido em: ${orderDate}</p> </div> <p class="font-bold text-lg text-cyan-400">R$ ${order.total.toFixed(2).replace('.', ',')}</p> </div>
+                <ul class="list-disc list-inside my-3 text-gray-300 pl-2"> ${order.items.map(item => `<li>${item.quantity}x ${item.name}</li>`).join('')} </ul>
+                <div class="flex gap-4"> <button onclick="confirmOrder('${order.id}')" class="w-full bg-green-500 hover:bg-green-400 text-black font-bold py-2 px-4 rounded-lg">Confirmar Venda</button> <button onclick="cancelOrder('${order.id}')" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg">Cancelar Pedido</button> </div>
             </div>`;
         });
     });
 }
 
+function displayFinancialDashboard() {
+    const cashFlowRef = db.ref('fluxoDeCaixa');
+    const salesRef = db.ref('vendas');
+
+    cashFlowRef.on('value', snapshot => {
+        let totalRevenue = 0;
+        let totalExpenses = 0;
+        if (snapshot.exists()) {
+            snapshot.forEach(child => {
+                const entry = child.val();
+                if (entry.type === 'entrada') totalRevenue += entry.amount;
+                if (entry.type === 'saida') totalExpenses += entry.amount;
+            });
+        }
+        totalRevenueEl.textContent = `R$ ${totalRevenue.toFixed(2).replace('.', ',')}`;
+        totalExpensesEl.textContent = `R$ ${totalExpenses.toFixed(2).replace('.', ',')}`;
+        currentBalanceEl.textContent = `R$ ${(totalRevenue - totalExpenses).toFixed(2).replace('.', ',')}`;
+    });
+
+    salesRef.orderByChild('createdAt').on('value', snapshot => {
+        salesReportTableBody.innerHTML = '';
+        if (!snapshot.exists()) {
+            salesReportTableBody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-gray-500">Nenhuma venda registrada.</td></tr>';
+            return;
+        }
+        let salesData = [];
+        snapshot.forEach(child => { salesData.push(child.val()); });
+        
+        salesData.reverse().forEach(sale => {
+            const saleDate = new Date(sale.createdAt).toLocaleDateString('pt-BR');
+            const itemsSummary = sale.items.map(i => `${i.quantity}x ${i.name}`).join(', ');
+            salesReportTableBody.innerHTML += `
+                <tr class="border-b border-gray-700">
+                    <td class="p-2">${saleDate}</td>
+                    <td class="p-2">${sale.customer.name}</td>
+                    <td class="p-2 text-sm">${itemsSummary}</td>
+                    <td class="p-2 text-right font-semibold">R$ ${sale.total.toFixed(2).replace('.', ',')}</td>
+                </tr>
+            `;
+        });
+        
+        exportSalesBtn.onclick = () => exportToCSV(salesData, 'relatorio_vendas');
+    });
+}
+
 async function confirmOrder(orderId) {
     if (!confirm('Esta ação irá registrar a venda, lançar no caixa e dar baixa no estoque. Deseja continuar?')) return;
-    
     const orderSnapshot = await db.ref(`pedidos/${orderId}`).once('value');
     if (!orderSnapshot.exists()) { alert("Pedido não encontrado ou já processado."); return; }
     const order = orderSnapshot.val();
-    
-    // Checagem de estoque antes de processar
     for (const item of order.items) {
         const productSnapshot = await db.ref(`estoque/${item.id}/quantity`).once('value');
         const currentQuantity = productSnapshot.val();
         if (currentQuantity < item.quantity) {
             alert(`Erro: Estoque insuficiente para o produto "${item.name}". Apenas ${currentQuantity} unidade(s) disponível(eis).`);
-            return; // Interrompe a operação
+            return;
         }
     }
-
     try {
         const saleData = { items: order.items, total: order.total, createdAt: firebase.database.ServerValue.TIMESTAMP, seller: auth.currentUser.email, customer: {name: order.customerName, whatsapp: order.customerWhatsapp} };
         const saleRef = await db.ref('vendas').push(saleData);
         await db.ref('fluxoDeCaixa').push({ type: 'entrada', description: `Venda #${saleRef.key}`, amount: order.total, createdAt: firebase.database.ServerValue.TIMESTAMP });
-        
         const updates = {};
-        order.items.forEach(item => {
-            const currentQuantity = fullInventory[item.id].quantity;
-            updates[`/estoque/${item.id}/quantity`] = currentQuantity - item.quantity;
-        });
+        for (const item of order.items) {
+            const productSnapshot = await db.ref(`estoque/${item.id}/quantity`).once('value');
+            updates[`/estoque/${item.id}/quantity`] = productSnapshot.val() - item.quantity;
+        }
         await db.ref().update(updates);
-        
         await db.ref(`pedidos/${orderId}`).remove();
         alert('Venda confirmada e processada com sucesso!');
     } catch (error) {
@@ -300,7 +339,7 @@ async function confirmOrder(orderId) {
 }
 
 async function cancelOrder(orderId) {
-    if (!confirm('Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita.')) return;
+    if (!confirm('Tem certeza que deseja cancelar este pedido?')) return;
     try {
         await db.ref(`pedidos/${orderId}`).remove();
         alert('Pedido cancelado com sucesso.');
@@ -310,6 +349,25 @@ async function cancelOrder(orderId) {
     }
 }
 
+function exportToCSV(data, filename) {
+    const header = "Data,Cliente,Itens,Total\n";
+    const rows = data.map(sale => {
+        const date = new Date(sale.createdAt).toLocaleDateString('pt-BR');
+        const customer = `"${sale.customer.name.replace(/"/g, '""')}"`;
+        const items = `"${sale.items.map(i => `${i.quantity}x ${i.name}`).join('; ')}"`;
+        const total = sale.total.toFixed(2);
+        return [date, customer, items, total].join(',');
+    }).join('\n');
+    
+    const csvContent = "data:text/csv;charset=utf-8," + header + rows;
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${filename}_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 // INICIA O SISTEMA
 displayProducts();
-
