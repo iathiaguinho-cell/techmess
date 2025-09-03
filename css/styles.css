@@ -9,21 +9,40 @@ body {
 /* Efeito de gradiente no título */
 .techmess-title {
   background: linear-gradient(90deg, #00d2ff, #3a7bd5);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-fill-color: transparent;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; text-fill-color: transparent;
 }
-
 .techmess-title-alt {
   background: linear-gradient(90deg, #00d2ff, #6c9eff);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-fill-color: transparent;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; text-fill-color: transparent;
 }
 
-/* Estilo base para inputs do formulário para evitar repetição */
+/* Componentes de UI reutilizáveis */
 .form-input {
-    @apply p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 outline-none;
+    @apply p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 outline-none transition-colors;
+}
+.label {
+    @apply block text-sm font-medium text-gray-300 mb-1;
+}
+.btn-primary {
+    @apply hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg transition-all flex items-center gap-2 justify-center;
+}
+.btn-secondary {
+    @apply bg-gray-600 hover:bg-gray-500 text-white py-2 px-6 rounded-lg font-semibold transition-colors;
+}
+.modal-container {
+    @apply fixed inset-0 z-[51] hidden items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm p-4;
+}
+.modal-content {
+    @apply bg-gray-800 border border-gray-700 p-8 rounded-xl shadow-lg w-full text-left overflow-y-auto max-h-[90vh];
+}
+.modal-title {
+    @apply text-2xl font-bold text-white mb-6 text-center;
+}
+.modal-footer {
+    @apply flex justify-end gap-4 mt-8;
+}
+.modal-close-btn {
+    @apply mt-4 text-gray-500 hover:text-white text-sm text-center w-full;
 }
