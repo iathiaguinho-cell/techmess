@@ -6,7 +6,7 @@ body {
   display: none;
 }
 
-/* Efeito de gradiente no título, inspirado no logo da Techmess */
+/* Efeito de gradiente no título */
 .techmess-title {
   background: linear-gradient(90deg, #00d2ff, #3a7bd5);
   -webkit-background-clip: text;
@@ -21,4 +21,9 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   text-fill-color: transparent;
+}
+
+/* Estilo base para inputs do formulário para evitar repetição */
+.form-input {
+    @apply p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 outline-none;
 }
