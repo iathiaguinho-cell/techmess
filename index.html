@@ -64,14 +64,54 @@
             </div>
         </div>
         
+        <!-- SEÇÃO FINANCEIRA -->
+        <div class="mt-12 pt-8 border-t border-gray-700">
+            <h2 class="text-3xl font-bold text-white mb-6">Financeiro</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div class="bg-gray-800 p-4 rounded-lg">
+                    <h3 class="text-sm font-semibold text-gray-400">ENTRADAS (VENDAS)</h3>
+                    <p id="total-revenue" class="text-2xl font-bold text-green-400">R$ 0,00</p>
+                </div>
+                <div class="bg-gray-800 p-4 rounded-lg">
+                    <h3 class="text-sm font-semibold text-gray-400">SAÍDAS (DESPESAS)</h3>
+                    <p id="total-expenses" class="text-2xl font-bold text-red-400">R$ 0,00</p>
+                </div>
+                <div class="bg-gray-800 p-4 rounded-lg border border-cyan-500">
+                    <h3 class="text-sm font-semibold text-gray-400">SALDO ATUAL</h3>
+                    <p id="current-balance" class="text-2xl font-bold text-cyan-400">R$ 0,00</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEÇÃO RELATÓRIO DE VENDAS -->
+        <div class="mt-12 pt-8 border-t border-gray-700">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-bold text-white">Relatório de Vendas</h2>
+                <button id="export-sales-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg text-sm">Exportar (CSV)</button>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4 overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="p-2">Data</th>
+                            <th class="p-2">Cliente</th>
+                            <th class="p-2">Itens</th>
+                            <th class="p-2 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sales-report-table-body">
+                        <tr><td colspan="4" class="text-center p-4 text-gray-500">Nenhuma venda registrada.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="mt-12 pt-8 border-t border-gray-700">
             <h2 class="text-3xl font-bold text-white mb-8">Estoque</h2>
-            <button id="newProductBtn" class="bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-2">
+            <button id="newProductBtn" class="bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-2 px-4 rounded-lg flex items-center gap-2">
                 <i class='bx bx-plus'></i> Adicionar Novo Produto
             </button>
-            <div id="inventory-list" class="mt-8">
-                <!-- A lista de produtos do estoque para gerenciar aparecerá aqui -->
-            </div>
+            <!-- A lista de produtos do estoque será gerenciada em uma futura tela dedicada -->
         </div>
     </main>
   </div>
@@ -81,11 +121,11 @@
       <div class="bg-gray-800 border border-gray-700 p-8 rounded-xl shadow-lg w-full max-w-sm text-center">
         <h2 class="text-2xl font-bold text-white mb-6">Acesso Administrativo</h2>
         <form id="loginForm" class="text-left">
-          <div class="mb-4"> <label for="emailInput" class="block text-sm font-medium text-gray-300 mb-1">E-mail</label> <input type="email" id="emailInput" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"> </div>
-          <div class="mb-6"> <label for="passwordInput" class="block text-sm font-medium text-gray-300 mb-1">Senha</label> <input type="password" id="passwordInput" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"> </div>
-          <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-400 text-black py-2 rounded-lg font-bold transition-colors">Entrar</button> <p id="loginError" class="text-red-500 text-sm mt-4 text-center h-4"></p>
+          <div class="mb-4"> <label for="emailInput" class="block text-sm font-medium text-gray-300 mb-1">E-mail</label> <input type="email" id="emailInput" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 outline-none"> </div>
+          <div class="mb-6"> <label for="passwordInput" class="block text-sm font-medium text-gray-300 mb-1">Senha</label> <input type="password" id="passwordInput" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 outline-none"> </div>
+          <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-400 text-black py-2 rounded-lg font-bold">Entrar</button> <p id="loginError" class="text-red-500 text-sm mt-4 text-center h-4"></p>
         </form>
-        <button id="closeLoginModalBtn" class="mt-4 text-gray-500 hover:text-white text-sm transition-colors">Fechar</button>
+        <button id="closeLoginModalBtn" class="mt-4 text-gray-500 hover:text-white text-sm">Fechar</button>
       </div>
   </div>
   
