@@ -10,17 +10,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Tailwind CSS via CDN -->
+    <!-- Tailwind CSS via CDN (Ideal para desenvolvimento, substituir por build em produção) -->
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/styles.css">
-
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
 </head>
 <body class="bg-gray-900 text-gray-100 font-['Poppins']">
 
@@ -30,9 +24,15 @@
     </div>
 
     <!-- Modal Container -->
-    <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden items-center justify-center">
+    <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden items-center justify-center p-4">
         <!-- Modais serão injetados aqui -->
     </div>
+
+    <!-- Firebase SDKs (Carregamento seguro via Firebase Hosting) -->
+    <script src="/__/firebase/8.10.0/firebase-app.js"></script>
+    <script src="/__/firebase/8.10.0/firebase-auth.js"></script>
+    <script src="/__/firebase/8.10.0/firebase-database.js"></script>
+    <script src="/__/firebase/init.js"></script>
 
     <!-- Script principal da aplicação -->
     <script src="js/app.js"></script>
