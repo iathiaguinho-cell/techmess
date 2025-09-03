@@ -38,7 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
         modalContainer.classList.remove('flex');
     };
     
-    // Adiciona listener para fechar modal ao clicar no fundo
     modalContainer.addEventListener('click', (e) => {
         if (e.target === modalContainer) {
             closeModal();
@@ -73,15 +72,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // =================================================================================
 
     auth.onAuthStateChanged(user => {
-        const path = window.location.pathname;
+        // Simplesmente renderiza o painel se logado, ou a vitrine se não.
+        // A navegação para /admin (ou qualquer outra rota) pode ser tratada por regras de segurança do Firebase.
         if (user) {
             renderAdminPanel();
         } else {
-            if (path.startsWith('/admin')) {
-                renderLoginScreen();
-            } else {
-                renderStorefront();
-            }
+            renderStorefront();
         }
     });
 
@@ -170,7 +166,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await ref.set(productData);
     
-            // Kardex: Registra apenas se a quantidade mudou
             const qtdChange = productData.quantidade - oldData.quantidade;
             if (qtdChange !== 0) {
                 const kardexId = db.ref(`kardex/${finalProductId}`).push().key;
@@ -205,7 +200,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const kardexUpdates = {};
         const vendaId = db.ref('vendas').push().key;
         
-        // 1. Prepara registro de venda
         updates[`/vendas/${vendaId}`] = {
             clienteNome: pedido.nome,
             whatsapp: pedido.whatsapp,
@@ -215,10 +209,8 @@ document.addEventListener('DOMContentLoaded', () => {
             status: 'Confirmada'
         };
         
-        // 2. Prepara remoção do pedido
         updates[`/pedidos/${pedidoId}`] = null;
     
-        // 3. Valida estoque e prepara atualizações
         for (const item of pedido.items) {
             const estoqueRef = db.ref(`estoque/${item.id}`);
             const snap = await estoqueRef.once('value');
@@ -226,7 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
             if (!produtoEmEstoque || produtoEmEstoque.quantidade < item.quantity) {
                 alert(`Estoque insuficiente para o produto: ${item.name}. Venda não pode ser confirmada.`);
-                return; // Aborta a operação inteira
+                return;
             }
             updates[`/estoque/${item.id}/quantidade`] = produtoEmEstoque.quantidade - item.quantity;
             
@@ -240,7 +232,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         try {
-            // Executa todas as atualizações de forma atômica
             await db.ref().update({ ...updates, ...kardexUpdates });
             alert('Venda confirmada e estoque atualizado!');
         } catch (error) {
@@ -255,7 +246,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const pedidoSnap = await pedidoRef.once('value');
             const pedido = pedidoSnap.val();
 
-            // Move para vendas com status "Cancelado" em vez de apagar
             const vendaId = db.ref('vendas').push().key;
             const updates = {};
             updates[`/vendas/${vendaId}`] = { ...pedido, status: 'Cancelado' };
@@ -333,9 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('close-modal-btn').addEventListener('click', closeModal);
         document.getElementById('order-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            const name = document.getElementById('customer-name').value;
-            const whatsapp = document.getElementById('customer-whatsapp').value;
-            placeOrder(name, whatsapp);
+            placeOrder(document.getElementById('customer-name').value, document.getElementById('customer-whatsapp').value);
         });
     };
 
@@ -390,19 +378,19 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('cancel-product-btn').addEventListener('click', closeModal);
         document.getElementById('product-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            document.getElementById('save-product-btn').disabled = true;
-            document.getElementById('save-product-btn').textContent = 'Salvando...';
+            const saveBtn = document.getElementById('save-product-btn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Salvando...';
 
             const imageFile = document.getElementById('product-image-file').files[0];
             let imageUrl = document.getElementById('product-image-url').value;
 
             if (imageFile) {
-                const uploadStatusEl = document.getElementById('upload-status');
-                imageUrl = await uploadImage(imageFile, uploadStatusEl);
+                imageUrl = await uploadImage(imageFile, document.getElementById('upload-status'));
                 if (!imageUrl) {
-                    document.getElementById('save-product-btn').disabled = false;
-                    document.getElementById('save-product-btn').textContent = 'Salvar';
-                    return; // Aborta se o upload falhar
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Salvar';
+                    return;
                 }
             }
 
@@ -414,8 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 nivelAlerta: parseInt(document.getElementById('product-alert').value),
                 imagemUrl: imageUrl,
             };
-            const currentProductId = document.getElementById('product-id').value;
-            await saveProduct(currentProductId, productData);
+            await saveProduct(document.getElementById('product-id').value, productData);
         });
     };
     
@@ -423,8 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const productSnap = await db.ref(`estoque/${productId}`).once('value');
         const product = productSnap.val();
         
-        const kardexRef = db.ref(`kardex/${productId}`).orderByChild('data');
-        const kardexSnap = await kardexRef.once('value');
+        const kardexSnap = await db.ref(`kardex/${productId}`).orderByChild('data').once('value');
         const movements = kardexSnap.val() || {};
         
         let movementsHtml = Object.values(movements).sort((a, b) => new Date(b.data) - new Date(a.data)).map(m => `
@@ -514,3 +500,127 @@ document.addEventListener('DOMContentLoaded', () => {
         productsRef.on('value', snapshot => {
             const products = snapshot.val();
             const productGrid = document.getElementById('product-grid');
+            productGrid.innerHTML = ''; // Limpa a grade
+    
+            if (products) {
+                Object.keys(products).forEach(key => {
+                    const product = products[key];
+                    const isOutOfStock = product.quantidade <= 0;
+                    
+                    // Construção segura do DOM para evitar XSS
+                    const productCard = document.createElement('div');
+                    productCard.className = `bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-transform transform hover:scale-105 ${isOutOfStock ? 'opacity-50' : ''}`;
+                    
+                    const img = document.createElement('img');
+                    img.className = 'w-full h-48 object-cover';
+                    img.src = product.imagemUrl || 'https://via.placeholder.com/400x300';
+                    img.alt = product.nome;
+                    
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'p-4 flex flex-col flex-grow';
+                    
+                    const title = document.createElement('h3');
+                    title.className = 'text-lg font-semibold text-gray-100';
+                    title.textContent = product.nome;
+                    
+                    const description = document.createElement('p');
+                    description.className = 'text-gray-400 mt-1 h-10 overflow-hidden text-sm';
+                    description.textContent = product.descricao || 'Sem descrição.';
+                    
+                    const footerDiv = document.createElement('div');
+                    footerDiv.className = 'flex justify-between items-center mt-4';
+                    
+                    const price = document.createElement('span');
+                    price.className = 'text-xl font-bold text-cyan-400';
+                    price.textContent = `R$ ${parseFloat(product.preco || 0).toFixed(2)}`;
+                    
+                    footerDiv.appendChild(price);
+                    
+                    if (isOutOfStock) {
+                        const outOfStockLabel = document.createElement('span');
+                        outOfStockLabel.className = 'text-red-500 font-semibold';
+                        outOfStockLabel.textContent = 'Esgotado';
+                        footerDiv.appendChild(outOfStockLabel);
+                    } else {
+                        const addButton = document.createElement('button');
+                        addButton.dataset.id = key;
+                        addButton.className = 'add-to-cart-btn bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded transition';
+                        addButton.textContent = 'Adicionar';
+                        footerDiv.appendChild(addButton);
+                    }
+                    
+                    contentDiv.appendChild(title);
+                    contentDiv.appendChild(description);
+                    contentDiv.appendChild(footerDiv);
+                    productCard.appendChild(img);
+                    productCard.appendChild(contentDiv);
+                    
+                    productGrid.appendChild(productCard);
+                });
+            } else {
+                productGrid.innerHTML = '<p class="col-span-full text-center text-gray-400">Nenhum produto encontrado no momento.</p>';
+            }
+        });
+
+        document.getElementById('cart-button').addEventListener('click', showCartModal);
+        document.getElementById('admin-login-button').addEventListener('click', renderLoginScreen);
+        appContainer.addEventListener('click', e => {
+            if (e.target && e.target.classList.contains('add-to-cart-btn')) {
+                addToCart(e.target.dataset.id);
+            }
+        });
+    };
+
+    const renderAdminPanel = (activeTab = 'dashboard') => {
+        appContainer.innerHTML = `
+            <div class="flex h-screen bg-gray-900">
+                <aside class="w-64 bg-gray-800 text-gray-200 flex flex-col">
+                    <div class="h-16 flex items-center justify-center border-b border-gray-700">
+                        <h1 class="text-2xl font-bold text-cyan-400">Techmess ERP</h1>
+                    </div>
+                    <nav id="admin-nav" class="flex-1 p-4 space-y-2">
+                        <a href="#" data-tab="dashboard" class="flex items-center px-4 py-2 rounded-md hover:bg-gray-700">Dashboard</a>
+                        <a href="#" data-tab="vendas" class="flex items-center px-4 py-2 rounded-md hover:bg-gray-700">Vendas</a>
+                        <a href="#" data-tab="compras" class="flex items-center px-4 py-2 rounded-md hover:bg-gray-700">Compras</a>
+                        <a href="#" data-tab="estoque" class="flex items-center px-4 py-2 rounded-md hover:bg-gray-700">Estoque</a>
+                        <a href="#" data-tab="financeiro" class="flex items-center px-4 py-2 rounded-md hover:bg-gray-700">Financeiro</a>
+                        <a href="#" data-tab="fornecedores" class="flex items-center px-4 py-2 rounded-md hover:bg-gray-700">Fornecedores</a>
+                    </nav>
+                    <div class="p-4 border-t border-gray-700">
+                        <button id="logout-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Sair</button>
+                    </div>
+                </aside>
+                <main id="admin-content" class="flex-1 p-8 overflow-y-auto">
+                    <!-- Conteúdo da aba será carregado aqui -->
+                </main>
+            </div>
+        `;
+
+        document.querySelector(`#admin-nav a[data-tab="${activeTab}"]`).classList.add('bg-cyan-600', 'text-white');
+        renderAdminTab(activeTab);
+
+        document.getElementById('logout-btn').addEventListener('click', handleLogout);
+        document.getElementById('admin-nav').addEventListener('click', e => {
+            e.preventDefault();
+            if (e.target.tagName === 'A' && e.target.dataset.tab) {
+                renderAdminPanel(e.target.dataset.tab);
+            }
+        });
+    };
+    
+    const renderAdminTab = (tab) => {
+        const contentArea = document.getElementById('admin-content');
+        if (!contentArea) return;
+
+        const renderFunctions = {
+            dashboard: renderDashboard,
+            vendas: renderVendas,
+            compras: renderCompras,
+            estoque: renderEstoque,
+            financeiro: renderFinanceiro,
+            fornecedores: renderFornecedores
+        };
+
+        const renderFn = renderFunctions[tab] || (() => {
+            contentArea.innerHTML = `<h1 class="text-2xl font-bold">Página não encontrada</h1>`;
+        });
