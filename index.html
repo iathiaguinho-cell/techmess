@@ -17,16 +17,21 @@
   <!-- ÁREA PÚBLICA (VITRINE PARA CLIENTES) -->
   <div id="public-area">
     <header class="bg-black/30 backdrop-blur-lg sticky top-0 z-50 border-b border-cyan-500/20">
-      <div class="container mx-auto px-6 py-4">
-        <h1 class="techmess-title text-4xl font-bold tracking-wider">TECHMESS</h1>
-        <p class="text-sm text-gray-400">Loja especializada em produtos Apple e eletrônicos</p>
+      <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+        <div>
+            <h1 class="techmess-title text-4xl font-bold tracking-wider">TECHMESS</h1>
+            <p class="text-sm text-gray-400">Loja especializada em produtos Apple e eletrônicos</p>
+        </div>
+        <button id="public-cart-btn" class="relative text-white p-2 rounded-full hover:bg-gray-700">
+            <i class='bx bxs-cart text-3xl'></i>
+            <span id="public-cart-count" class="absolute top-0 right-0 bg-cyan-500 text-black text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center hidden">0</span>
+        </button>
       </div>
     </header>
 
     <main id="showcase" class="container mx-auto p-6 mt-4">
       <h2 class="text-2xl font-semibold text-white mb-6">Produtos Disponíveis</h2>
       <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <!-- Os produtos serão carregados aqui pelo JavaScript -->
         <p class="col-span-full text-center text-gray-500 py-10">Carregando catálogo...</p>
       </div>
     </main>
@@ -51,59 +56,67 @@
        </div>
     </header>
     <main class="container mx-auto p-6">
-        <div class="mt-6">
+        <!-- SEÇÃO DE PEDIDOS PENDENTES -->
+        <div id="orders-section">
+            <h2 class="text-3xl font-bold text-white mb-6">Pedidos Pendentes</h2>
+            <div id="orders-list" class="space-y-4">
+                <p class="text-gray-500">Nenhum pedido novo no momento.</p>
+            </div>
+        </div>
+        
+        <div class="mt-12 pt-8 border-t border-gray-700">
+            <h2 class="text-3xl font-bold text-white mb-8">Estoque</h2>
             <button id="newProductBtn" class="bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-2">
                 <i class='bx bx-plus'></i> Adicionar Novo Produto
             </button>
-        </div>
-        <div id="inventory-list" class="mt-8">
-            <!-- A lista de produtos cadastrados para gerenciar aparecerá aqui -->
+            <div id="inventory-list" class="mt-8">
+                <!-- A lista de produtos do estoque para gerenciar aparecerá aqui -->
+            </div>
         </div>
     </main>
   </div>
 
-  <!-- MODAL DE LOGIN -->
+  <!-- MODAIS -->
   <div id="loginModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm">
-    <div class="bg-gray-800 border border-gray-700 p-8 rounded-xl shadow-lg w-full max-w-sm text-center">
-      <h2 class="text-2xl font-bold text-white mb-6">Acesso Administrativo</h2>
-      <form id="loginForm" class="text-left">
-        <div class="mb-4">
-          <label for="emailInput" class="block text-sm font-medium text-gray-300 mb-1">E-mail</label>
-          <input type="email" id="emailInput" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all">
-        </div>
-        <div class="mb-6">
-          <label for="passwordInput" class="block text-sm font-medium text-gray-300 mb-1">Senha</label>
-          <input type="password" id="passwordInput" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all">
-        </div>
-        <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-400 text-black py-2 rounded-lg font-bold transition-colors">Entrar</button>
-        <p id="loginError" class="text-red-500 text-sm mt-4 text-center h-4"></p>
-      </form>
-      <button id="closeLoginModalBtn" class="mt-4 text-gray-500 hover:text-white text-sm transition-colors">Fechar</button>
-    </div>
+      <div class="bg-gray-800 border border-gray-700 p-8 rounded-xl shadow-lg w-full max-w-sm text-center">
+        <h2 class="text-2xl font-bold text-white mb-6">Acesso Administrativo</h2>
+        <form id="loginForm" class="text-left">
+          <div class="mb-4"> <label for="emailInput" class="block text-sm font-medium text-gray-300 mb-1">E-mail</label> <input type="email" id="emailInput" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"> </div>
+          <div class="mb-6"> <label for="passwordInput" class="block text-sm font-medium text-gray-300 mb-1">Senha</label> <input type="password" id="passwordInput" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"> </div>
+          <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-400 text-black py-2 rounded-lg font-bold transition-colors">Entrar</button> <p id="loginError" class="text-red-500 text-sm mt-4 text-center h-4"></p>
+        </form>
+        <button id="closeLoginModalBtn" class="mt-4 text-gray-500 hover:text-white text-sm transition-colors">Fechar</button>
+      </div>
   </div>
   
-  <!-- MODAL PARA CADASTRO DE PRODUTO -->
   <div id="productModal" class="fixed inset-0 z-[51] hidden items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm p-4">
-    <div class="bg-gray-800 border border-gray-700 p-8 rounded-xl shadow-lg w-full max-w-md text-center">
-      <h2 id="productModalTitle" class="text-2xl font-bold text-white mb-6">Adicionar Novo Produto</h2>
-      <form id="productForm" class="text-left">
-        <div class="mb-4">
-          <label for="productName" class="block text-sm font-medium text-gray-300 mb-1">Nome do Produto</label>
-          <input type="text" id="productName" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all">
-        </div>
-        <div class="mb-4">
-          <label for="productPrice" class="block text-sm font-medium text-gray-300 mb-1">Preço (ex: 4999.90)</label>
-          <input type="number" step="0.01" id="productPrice" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all">
-        </div>
-        <div class="mb-6">
-          <label for="productImage" class="block text-sm font-medium text-gray-300 mb-1">Foto Principal</label>
-          <input type="file" id="productImage" required accept="image/*" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-500 file:text-black hover:file:bg-cyan-400 cursor-pointer">
-        </div>
-        <div class="flex justify-end gap-4 mt-8">
-          <button type="button" id="closeProductModalBtn" class="bg-gray-600 hover:bg-gray-500 text-white py-2 px-6 rounded-lg font-semibold transition-colors">Cancelar</button>
-          <button type="submit" id="saveProductBtn" class="bg-cyan-500 hover:bg-cyan-400 text-black py-2 px-6 rounded-lg font-bold transition-colors">Salvar Produto</button>
-        </div>
-      </form>
+      <div class="bg-gray-800 border border-gray-700 p-8 rounded-xl shadow-lg w-full max-w-lg text-center overflow-y-auto max-h-[90vh]">
+        <h2 id="productModalTitle" class="text-2xl font-bold text-white mb-6">Adicionar Novo Produto</h2>
+        <form id="productForm" class="text-left">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="md:col-span-2"> <label for="productName" class="block text-sm font-medium text-gray-300 mb-1">Nome do Produto</label> <input type="text" id="productName" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 outline-none"> </div>
+              <div> <label for="productPrice" class="block text-sm font-medium text-gray-300 mb-1">Preço (ex: 4999.90)</label> <input type="number" step="0.01" id="productPrice" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 outline-none"> </div>
+              <div> <label for="productQuantity" class="block text-sm font-medium text-gray-300 mb-1">Quantidade em Estoque</label> <input type="number" id="productQuantity" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 outline-none"> </div>
+              <div class="md:col-span-2"> <label for="productDescription" class="block text-sm font-medium text-gray-300 mb-1">Descrição Detalhada</label> <textarea id="productDescription" rows="5" class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="Especificações, cor, capacidade, etc."></textarea> </div>
+              <div class="md:col-span-2"> <label for="productImage" class="block text-sm font-medium text-gray-300 mb-1">Foto Principal</label> <input type="file" id="productImage" required accept="image/*" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-500 file:text-black hover:file:bg-cyan-400 cursor-pointer"> </div>
+          </div>
+          <div class="flex justify-end gap-4 mt-8"> <button type="button" id="closeProductModalBtn" class="bg-gray-600 hover:bg-gray-500 text-white py-2 px-6 rounded-lg font-semibold">Cancelar</button> <button type="submit" id="saveProductBtn" class="bg-cyan-500 hover:bg-cyan-400 text-black py-2 px-6 rounded-lg font-bold">Salvar Produto</button> </div>
+        </form>
+      </div>
+  </div>
+
+  <div id="checkoutModal" class="fixed inset-0 z-[52] hidden items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm p-4">
+    <div class="bg-gray-800 border border-gray-700 p-8 rounded-xl shadow-lg w-full max-w-2xl overflow-y-auto max-h-[90vh]">
+        <h2 class="text-2xl font-bold text-white mb-6">Finalizar Pedido</h2>
+        <div id="checkout-cart-items" class="space-y-3 mb-6"></div>
+        <div class="text-right text-xl font-bold mb-6">Total: <span id="checkout-total" class="text-cyan-400"></span></div>
+        <h3 class="text-lg font-semibold text-white mb-4">Seus Dados para Contato</h3>
+        <form id="checkoutForm">
+            <div class="mb-4"> <label for="customerName" class="block text-sm text-gray-300 mb-1">Nome Completo</label> <input type="text" id="customerName" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 outline-none"> </div>
+            <div class="mb-4"> <label for="customerWhatsapp" class="block text-sm text-gray-300 mb-1">WhatsApp (com DDD)</label> <input type="tel" id="customerWhatsapp" required class="p-2 border rounded w-full bg-gray-700 text-white border-gray-600 focus:ring-2 focus:ring-cyan-500 outline-none"> </div>
+            <p class="text-xs text-gray-400 mb-6">Entraremos em contato para combinar o pagamento e a entrega.</p>
+            <div class="flex justify-end gap-4"> <button type="button" id="closeCheckoutModalBtn" class="bg-gray-600 hover:bg-gray-500 text-white py-2 px-6 rounded-lg font-semibold">Cancelar</button> <button type="submit" id="submitOrderBtn" class="bg-green-500 hover:bg-green-400 text-black py-2 px-6 rounded-lg font-bold">Enviar Pedido</button> </div>
+        </form>
     </div>
   </div>
 
