@@ -1,44 +1,42 @@
-/* Define a fonte padrão para toda a aplicação */
-body {
-    font-family: 'Poppins', sans-serif;
+body { 
+  font-family: 'Poppins', sans-serif; 
 }
 
-/* Garante que os inputs e selects tenham fundo escuro e texto claro, corrigindo o problema de campos invisíveis */
+.hidden {
+  display: none;
+}
+
+/* Efeito de gradiente no título */
+.techmess-title, .techmess-title-alt {
+  background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; text-fill-color: transparent;
+}
+
+/* CORREÇÃO CRÍTICA PARA FORMULÁRIOS NO TEMA ESCURO */
 input, select, textarea {
     background-color: #1f2937; /* bg-gray-800 */
     color: #f3f4f6; /* text-gray-100 */
-    border: 1px solid #4b5563; /* border-gray-600 */
-    border-radius: 0.375rem; /* rounded-md */
-    padding: 0.5rem 0.75rem;
-    width: 100%; /* Garante que ocupem o espaço disponível */
+    border-color: #4b5563; /* border-gray-600 */
 }
-
-input:focus, select:focus, textarea:focus {
-    outline: none;
-    border-color: #0891b2; /* border-cyan-600 */
-    box-shadow: 0 0 0 2px #0e7490; /* ring-cyan-700 */
-}
-
-/* Estilo para o placeholder */
-::placeholder {
+input::placeholder, textarea::placeholder {
     color: #6b7280; /* text-gray-500 */
-    opacity: 1; 
 }
 
-/* Estilo para a barra de rolagem */
-::-webkit-scrollbar {
-    width: 8px;
-}
+/* Componentes de UI */
+.form-input { @apply p-2 border rounded w-full bg-gray-800 text-gray-100 border-gray-600 focus:ring-2 focus:ring-cyan-500 outline-none transition-colors; }
+.label { @apply block text-sm font-medium text-gray-300 mb-1; }
+.btn-primary { @apply hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg transition-all flex items-center gap-2 justify-center disabled:opacity-50 disabled:cursor-not-allowed; }
+.btn-secondary { @apply bg-gray-600 hover:bg-gray-500 text-white py-2 px-6 rounded-lg font-semibold transition-colors; }
+.modal-container { @apply fixed inset-0 z-[51] hidden items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm p-4; }
+.modal-content { @apply bg-gray-800 border border-gray-700 p-6 sm:p-8 rounded-xl shadow-lg w-full text-left overflow-y-auto max-h-[90vh]; }
+.modal-title { @apply text-2xl font-bold text-white mb-6 text-center; }
+.modal-footer { @apply flex justify-end gap-4 mt-8; }
 
-::-webkit-scrollbar-track {
-    background: #1f2937; /* bg-gray-800 */
+/* Abas de navegação */
+.tab-btn {
+    @apply px-4 sm:px-6 py-3 text-gray-400 border-b-2 border-transparent hover:text-white transition-colors whitespace-nowrap;
 }
-
-::-webkit-scrollbar-thumb {
-    background: #0891b2; /* bg-cyan-600 */
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #06b6d4; /* bg-cyan-500 */
+.tab-btn.active {
+    @apply text-cyan-400 border-cyan-400;
 }
