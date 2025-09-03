@@ -1,0 +1,24 @@
+body { 
+  font-family: 'Poppins', sans-serif; 
+}
+
+.hidden {
+  display: none;
+}
+
+/* Efeito de gradiente no título, inspirado no logo da Techmess */
+.techmess-title {
+  background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-fill-color: transparent;
+}
+
+.techmess-title-alt {
+  background: linear-gradient(90deg, #00d2ff, #6c9eff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-fill-color: transparent;
+}
