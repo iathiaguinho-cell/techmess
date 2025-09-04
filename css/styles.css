@@ -104,6 +104,29 @@ button:hover {
     background-color: #b91c1c;
 }
 
+/* Cart badge style */
+.cart-badge {
+    position: absolute;
+    top: -0.5rem;
+    right: -1rem;
+    background-color: #0891b2; /* bg-cyan-600 */
+    color: white;
+    font-size: 0.75rem;
+    font-weight: bold;
+    border-radius: 9999px;
+    height: 1.25rem;
+    width: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+.cart-badge.hidden {
+    transform: scale(0);
+    opacity: 0;
+}
+
+
 /* Table styles for management panel */
 table {
     width: 100%;
@@ -165,5 +188,4 @@ tbody tr:hover {
     border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: #6b7280;
-}
+    ba
