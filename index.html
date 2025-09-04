@@ -16,7 +16,12 @@
                 <ul class="flex space-x-4 items-center">
                     <li><a href="#" id="nav-home" class="hover:text-cyan-400">Home</a></li>
                     <li><a href="#" id="nav-shop" class="hover:text-cyan-400">Loja</a></li>
-                    <li><a href="#" id="nav-cart" class="hover:text-cyan-400">Carrinho</a></li>
+                    <li>
+                        <a href="#" id="nav-cart" class="hover:text-cyan-400 relative flex items-center">
+                            Carrinho
+                            <span id="cart-item-count" class="cart-badge">0</span>
+                        </a>
+                    </li>
                     <li class="hidden"><a href="#" id="nav-dashboard" class="hover:text-cyan-400">Dashboard</a></li>
                     <li><button id="auth-button" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded">Login</button></li>
                 </ul>
@@ -235,3 +240,4 @@
     <script src="./js/app.js"></script>
 </body>
 </html>
+
