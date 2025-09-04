@@ -6,7 +6,6 @@
  */
 
 // --- CONFIGURAÇÃO E INICIALIZAÇÃO ---
-// CORREÇÃO: Adicionada a databaseURL e corrigido o storageBucket
 const firebaseConfig = {
     apiKey: "AIzaSyARb-0QE9QcYD2OjkCsOj0pmKTgkJQRlSg",
     authDomain: "vipcell-gestor.firebaseapp.com",
@@ -33,14 +32,13 @@ let products = {};
 let suppliers = {};
 let currentPurchaseItems = {};
 let salesReportData = [];
-let isErpInitialized = false; // Flag para garantir que o painel seja inicializado apenas uma vez
+let isErpInitialized = false;
 
 // --- SELETORES DE ELEMENTOS DO DOM (CACHE) ---
 const getElem = (id) => document.getElementById(id);
 const querySel = (selector) => document.querySelector(selector);
 const querySelAll = (selector) => document.querySelectorAll(selector);
 
-// Objeto 'ui' para centralizar a referência aos elementos da interface
 const ui = {
     publicView: getElem('public-view'),
     managementPanel: getElem('management-panel'),
@@ -94,7 +92,11 @@ const ui = {
             priceInput: getElem('purchase-unit-price'),
             addItemButton: getElem('add-item-to-purchase-button'),
             itemsList: getElem('purchase-items-list'),
-            total: getElem('purchase-total')
+            total: getElem('purchase-total'),
+            // CAMPOS ADICIONADOS
+            invoiceInput: getElem('purchase-invoice-number'),
+            dateInput: getElem('purchase-date'),
+            paymentMethodSelect: getElem('purchase-payment-method')
         },
         stock: {
             content: getElem('stock-content'),
@@ -168,17 +170,16 @@ function toggleModal(modalElement, show) {
 
 // --- AUTENTICAÇÃO E INICIALIZAÇÃO DO PAINEL ---
 
-/**
- * Função dedicada a carregar todos os dados necessários para o painel de gestão.
- */
 function initializeErpPanel() {
-    console.log("Inicializando dados do Painel de Gestão...");
+    if (isErpInitialized) return;
+    console.log("A inicializar dados do Painel de Gestão...");
     loadStockManagement();
     loadSupplierManagement();
     loadPurchases();
     loadSales();
     loadFinance();
     calculateDailySalesAndMonthlyRevenue();
+    isErpInitialized = true;
 }
 
 auth.onAuthStateChanged(user => {
@@ -187,10 +188,9 @@ auth.onAuthStateChanged(user => {
     ui.nav.dashboard.parentElement.classList.toggle('hidden', !isLoggedIn);
     switchView(isLoggedIn ? 'management' : 'public');
 
-    if (isLoggedIn && !isErpInitialized) {
+    if (isLoggedIn) {
         initializeErpPanel();
-        isErpInitialized = true;
-    } else if (!isLoggedIn) {
+    } else {
         isErpInitialized = false;
     }
 });
@@ -199,8 +199,8 @@ function handleAuthClick() {
     if (auth.currentUser) {
         auth.signOut();
     } else {
-        const email = prompt('Digite seu e-mail:');
-        const password = prompt('Digite sua senha:');
+        const email = prompt('Digite o seu e-mail:');
+        const password = prompt('Digite a sua senha:');
         if (email && password) {
             auth.signInWithEmailAndPassword(email, password)
                 .catch(error => alert('Erro de login: ' + error.message));
@@ -241,11 +241,10 @@ function addToCart(productId) {
 }
 
 function removeFromCart(productId) {
-    if (cart[productId] && cart[productId].quantity > 0) {
+    if (cart[productId] && cart[productId].quantity > 1) {
         cart[productId].quantity--;
-        if (cart[productId].quantity === 0) {
-            delete cart[productId];
-        }
+    } else {
+        delete cart[productId];
     }
     updateCartDisplay();
 }
@@ -254,7 +253,7 @@ function updateCartDisplay() {
     let total = 0;
     const cartEntries = Object.entries(cart);
     ui.cart.items.innerHTML = cartEntries.length === 0
-        ? '<p>Seu carrinho está vazio.</p>'
+        ? '<p>O seu carrinho está vazio.</p>'
         : cartEntries.map(([id, item]) => {
             total += item.quantity * item.precoVenda;
             return `
@@ -264,7 +263,7 @@ function updateCartDisplay() {
                         <p>${item.quantity} x R$ ${item.precoVenda.toFixed(2).replace('.', ',')}</p>
                     </div>
                     <div class="item-actions">
-                        <button data-id="${id}" class="remove-from-cart-button">Remover</button>
+                        <button data-id="${id}" class="remove-from-cart-button bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded">Remover</button>
                     </div>
                 </div>
             `;
@@ -409,7 +408,7 @@ function openNewProductModal() {
 }
 
 function deleteProduct(productId) {
-    if (confirm('Tem certeza que deseja excluir este produto?')) {
+    if (confirm('Tem a certeza de que deseja excluir este produto?')) {
         database.ref('estoque/' + productId).remove()
             .then(() => alert('Produto excluído com sucesso!'))
             .catch(error => alert('Erro ao excluir produto: ' + error.message));
@@ -449,7 +448,7 @@ function loadSupplierManagement() {
         ui.erp.suppliers.list.innerHTML = `
             <table class="w-full text-sm">
                 <thead><tr><th>Nome</th><th>Contato</th><th>Ações</th></tr></thead>
-                <tbody>${tableBody || '<tr><td colspan="3" class="text-center">Nenhum fornecedor cadastrado.</td></tr>'}</tbody>
+                <tbody>${tableBody || '<tr><td colspan="3" class="text-center">Nenhum fornecedor registado.</td></tr>'}</tbody>
             </table>`;
     });
 }
@@ -474,7 +473,7 @@ function openNewSupplierModal() {
 }
 
 function deleteSupplier(id) {
-    if (confirm("Tem certeza que deseja excluir este fornecedor?")) {
+    if (confirm("Tem a certeza de que deseja excluir este fornecedor?")) {
         database.ref('fornecedores/' + id).remove()
         .then(() => alert("Fornecedor excluído."))
         .catch(e => alert("Erro: " + e.message));
@@ -487,11 +486,17 @@ function openNewPurchaseModal() {
     const supplierOptions = Object.entries(suppliers).map(([id, s]) => `<option value="${id}">${s.nome}</option>`).join('');
     const productOptions = Object.entries(products).map(([id, p]) => `<option value="${id}">${p.nome}</option>`).join('');
     if(!supplierOptions || !productOptions) {
-        alert("É necessário ter pelo menos um fornecedor e um produto cadastrado para registrar uma compra.");
+        alert("É necessário ter pelo menos um fornecedor e um produto registado para registar uma compra.");
         return;
     }
     ui.erp.purchases.supplierSelect.innerHTML = supplierOptions;
     ui.erp.purchases.productSelect.innerHTML = productOptions;
+    
+    // LIMPA E PREPARA OS CAMPOS
+    ui.erp.purchases.invoiceInput.value = '';
+    ui.erp.purchases.paymentMethodSelect.value = 'Boleto';
+    ui.erp.purchases.dateInput.value = new Date().toISOString().split('T')[0];
+    
     currentPurchaseItems = {};
     updatePurchaseItemsList();
     toggleModal(ui.erp.purchases.modal, true);
@@ -527,13 +532,17 @@ function removeItemFromPurchase(productId) {
     updatePurchaseItemsList();
 }
 
-
 function savePurchase() {
     const supplierId = ui.erp.purchases.supplierSelect.value;
-    if (!supplierId || Object.keys(currentPurchaseItems).length === 0) {
-        alert("Selecione um fornecedor e adicione pelo menos um item.");
+    const invoiceNumber = ui.erp.purchases.invoiceInput.value.trim();
+    const purchaseDate = ui.erp.purchases.dateInput.value;
+    const paymentMethod = ui.erp.purchases.paymentMethodSelect.value;
+
+    if (!supplierId || !invoiceNumber || !purchaseDate || Object.keys(currentPurchaseItems).length === 0) {
+        alert("Preencha todos os campos da compra (fornecedor, nº da nota, data) e adicione itens.");
         return;
     }
+
     const total = Object.values(currentPurchaseItems).reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const purchaseData = {
         fornecedorId: supplierId,
@@ -541,11 +550,15 @@ function savePurchase() {
         itens: currentPurchaseItems,
         total: total,
         status: 'Aguardando Recebimento',
-        data: new Date().toISOString()
+        dataRegistro: new Date().toISOString(),
+        // CAMPOS ADICIONADOS
+        numeroNota: invoiceNumber,
+        dataCompra: purchaseDate,
+        formaPagamento: paymentMethod
     };
     
     database.ref('compras').push(purchaseData).then(() => {
-        alert("Compra registrada com sucesso!");
+        alert("Compra registada com sucesso!");
         toggleModal(ui.erp.purchases.modal, false);
     }).catch(e => alert("Erro: " + e.message));
 }
@@ -555,16 +568,18 @@ function loadPurchases() {
         const purchases = snapshot.val() || {};
         const tableBody = Object.entries(purchases).map(([id, p]) => `
             <tr>
-                <td>${new Date(p.data).toLocaleDateString()}</td>
+                <td>${new Date(p.dataCompra).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</td>
+                <td>${p.numeroNota}</td>
                 <td>${p.fornecedorNome}</td>
                 <td>R$ ${p.total.toFixed(2)}</td>
+                <td>${p.formaPagamento}</td>
                 <td>${p.status}</td>
                 <td>${p.status === 'Aguardando Recebimento' ? `<button class="confirm-receipt-button bg-green-600 text-white text-xs px-2 py-1 rounded" data-id="${id}">Confirmar Receb.</button>` : ''}</td>
             </tr>`).join('');
         ui.erp.purchases.list.innerHTML = `
             <table class="w-full text-sm">
-                <thead><tr><th>Data</th><th>Fornecedor</th><th>Total</th><th>Status</th><th>Ações</th></tr></thead>
-                <tbody>${tableBody || '<tr><td colspan="5" class="text-center">Nenhuma compra registrada.</td></tr>'}</tbody>
+                <thead><tr><th>Data</th><th>Nº Nota</th><th>Fornecedor</th><th>Total</th><th>Pagamento</th><th>Status</th><th>Ações</th></tr></thead>
+                <tbody>${tableBody || '<tr><td colspan="7" class="text-center">Nenhuma compra registada.</td></tr>'}</tbody>
             </table>`;
     });
 }
@@ -573,7 +588,7 @@ async function confirmPurchaseReceipt(purchaseId) {
     const purchaseRef = database.ref('compras/' + purchaseId);
     const purchaseSnapshot = await purchaseRef.once('value');
     const purchase = purchaseSnapshot.val();
-    if (purchase && confirm('Confirmar recebimento desta compra? O estoque será atualizado.')) {
+    if (purchase && confirm('Confirmar o recebimento desta compra? O estoque será atualizado.')) {
         const updates = {};
         for (const [itemId, item] of Object.entries(purchase.itens)) {
             updates[`/estoque/${itemId}/quantidade`] = firebase.database.ServerValue.increment(item.quantity);
@@ -582,9 +597,9 @@ async function confirmPurchaseReceipt(purchaseId) {
 
         await database.ref('fluxoDeCaixa').push({
             tipo: 'Pagar',
-            descricao: `Compra #${purchaseId.slice(-5)} - ${purchase.fornecedorNome}`,
+            descricao: `Compra NF #${purchase.numeroNota} - ${purchase.fornecedorNome}`,
             valor: purchase.total,
-            data: new Date().toISOString(),
+            data: purchase.dataCompra,
             status: 'Pendente'
         });
         
@@ -649,16 +664,17 @@ async function confirmSale(orderId) {
     await Promise.all(stockChecks);
 
     if (!hasEnoughStock) {
-        return; // Stop if any product is out of stock
+        return;
     }
 
     await database.ref().update(updates);
-    await database.ref('vendas').push(order);
+    const newSaleRef = await database.ref('vendas').push(order);
+    const newSaleId = newSaleRef.key;
     await database.ref('fluxoDeCaixa').push({
         tipo: 'Receber',
-        descricao: `Venda #${orderId.slice(-5)} - ${order.cliente}`,
+        descricao: `Venda #${newSaleId.slice(-5)} - ${order.cliente}`,
         valor: order.total,
-        data: new Date().toISOString(),
+        data: order.data,
         status: 'Pendente'
     });
     await orderRef.remove();
@@ -666,7 +682,7 @@ async function confirmSale(orderId) {
 }
 
 function cancelOrder(orderId) {
-    if (confirm('Tem certeza que deseja cancelar este pedido?')) {
+    if (confirm('Tem a certeza de que deseja cancelar este pedido?')) {
         database.ref('pedidos/' + orderId).remove().then(() => alert('Pedido cancelado!'));
     }
 }
@@ -686,7 +702,7 @@ function loadFinance() {
             const valorSignal = isReceber ? '+' : '-';
             return `
             <tr>
-                <td>${new Date(t.data).toLocaleDateString()}</td>
+                <td>${new Date(t.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</td>
                 <td>${t.tipo}</td>
                 <td>${t.descricao}</td>
                 <td class="${valorClass}">${valorSignal} R$ ${t.valor.toFixed(2)}</td>
@@ -737,7 +753,7 @@ function generateSalesReport() {
 
         const tableBody = salesReportData.map(sale => {
             const items = Object.values(sale.itens).map(i => `${i.quantity}x ${i.nome}`).join('<br>');
-            return `<tr><td>${new Date(sale.data).toLocaleString()}</td><td>${sale.cliente}</td><td>${items}</td><td>R$ ${sale.total.toFixed(2)}</td></tr>`;
+            return `<tr><td>${new Date(sale.data).toLocaleString('pt-BR')}</td><td>${sale.cliente}</td><td>${items}</td><td>R$ ${sale.total.toFixed(2)}</td></tr>`;
         }).join('');
 
         ui.erp.finance.reportResults.innerHTML = `
@@ -862,12 +878,8 @@ function attachEventListeners() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Esconde todos os modais ao iniciar
     querySelAll('.modal-backdrop').forEach(modal => modal.classList.add('hidden'));
-    
-    // Carrega os produtos da vitrine pública imediatamente
     loadPublicProducts();
-    
-    // Anexa todos os event listeners
     attachEventListeners();
 });
+
