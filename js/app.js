@@ -47,7 +47,8 @@ const ui = {
         home: getElem('nav-home'),
         shop: getElem('nav-shop'),
         cart: getElem('nav-cart'),
-        dashboard: getElem('nav-dashboard')
+        dashboard: getElem('nav-dashboard'),
+        cartItemCount: getElem('cart-item-count')
     },
     shop: {
         productList: getElem('product-list')
@@ -93,7 +94,6 @@ const ui = {
             addItemButton: getElem('add-item-to-purchase-button'),
             itemsList: getElem('purchase-items-list'),
             total: getElem('purchase-total'),
-            // CAMPOS ADICIONADOS
             invoiceInput: getElem('purchase-invoice-number'),
             dateInput: getElem('purchase-date'),
             paymentMethodSelect: getElem('purchase-payment-method')
@@ -186,11 +186,12 @@ auth.onAuthStateChanged(user => {
     const isLoggedIn = !!user;
     ui.authButton.textContent = isLoggedIn ? 'Logout' : 'Login';
     ui.nav.dashboard.parentElement.classList.toggle('hidden', !isLoggedIn);
-    switchView(isLoggedIn ? 'management' : 'public');
-
+    
     if (isLoggedIn) {
+        switchView('management');
         initializeErpPanel();
     } else {
+        switchView('public');
         isErpInitialized = false;
     }
 });
@@ -251,11 +252,14 @@ function removeFromCart(productId) {
 
 function updateCartDisplay() {
     let total = 0;
+    let totalItems = 0;
     const cartEntries = Object.entries(cart);
+
     ui.cart.items.innerHTML = cartEntries.length === 0
         ? '<p>O seu carrinho está vazio.</p>'
         : cartEntries.map(([id, item]) => {
             total += item.quantity * item.precoVenda;
+            totalItems += item.quantity;
             return `
                 <div class="cart-item">
                     <div class="item-info">
@@ -268,8 +272,16 @@ function updateCartDisplay() {
                 </div>
             `;
         }).join('');
+        
     ui.cart.total.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
     ui.cart.checkoutButton.disabled = cartEntries.length === 0;
+
+    if (totalItems > 0) {
+        ui.nav.cartItemCount.textContent = totalItems;
+        ui.nav.cartItemCount.classList.remove('hidden');
+    } else {
+        ui.nav.cartItemCount.classList.add('hidden');
+    }
 }
 
 function submitCheckout() {
@@ -297,7 +309,10 @@ function submitCheckout() {
         toggleModal(ui.checkout.modal, false);
         ui.checkout.nameInput.value = '';
         ui.checkout.whatsappInput.value = '';
-    }).catch(error => alert('Erro ao realizar pedido: ' + error.message));
+    }).catch(error => {
+        console.error("Erro no checkout:", error);
+        alert('Erro ao realizar pedido: ' + error.message);
+    });
 }
 
 // --- MÓDULO: ESTOQUE (ERP) ---
@@ -492,7 +507,6 @@ function openNewPurchaseModal() {
     ui.erp.purchases.supplierSelect.innerHTML = supplierOptions;
     ui.erp.purchases.productSelect.innerHTML = productOptions;
     
-    // LIMPA E PREPARA OS CAMPOS
     ui.erp.purchases.invoiceInput.value = '';
     ui.erp.purchases.paymentMethodSelect.value = 'Boleto';
     ui.erp.purchases.dateInput.value = new Date().toISOString().split('T')[0];
@@ -551,7 +565,6 @@ function savePurchase() {
         total: total,
         status: 'Aguardando Recebimento',
         dataRegistro: new Date().toISOString(),
-        // CAMPOS ADICIONADOS
         numeroNota: invoiceNumber,
         dataCompra: purchaseDate,
         formaPagamento: paymentMethod
@@ -567,20 +580,42 @@ function loadPurchases() {
     database.ref('compras').on('value', snapshot => {
         const purchases = snapshot.val() || {};
         const tableBody = Object.entries(purchases).map(([id, p]) => `
-            <tr>
+            <tr class="align-middle">
                 <td>${new Date(p.dataCompra).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</td>
                 <td>${p.numeroNota}</td>
                 <td>${p.fornecedorNome}</td>
                 <td>R$ ${p.total.toFixed(2)}</td>
                 <td>${p.formaPagamento}</td>
                 <td>${p.status}</td>
-                <td>${p.status === 'Aguardando Recebimento' ? `<button class="confirm-receipt-button bg-green-600 text-white text-xs px-2 py-1 rounded" data-id="${id}">Confirmar Receb.</button>` : ''}</td>
+                <td class="flex items-center">
+                    ${p.status === 'Aguardando Recebimento' ? `<button class="confirm-receipt-button bg-green-600 text-white text-xs px-2 py-1 rounded" data-id="${id}">Receber</button>` : ''}
+                    <button class="delete-purchase-button bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded ml-2" data-id="${id}">Excluir</button>
+                </td>
             </tr>`).join('');
         ui.erp.purchases.list.innerHTML = `
             <table class="w-full text-sm">
                 <thead><tr><th>Data</th><th>Nº Nota</th><th>Fornecedor</th><th>Total</th><th>Pagamento</th><th>Status</th><th>Ações</th></tr></thead>
                 <tbody>${tableBody || '<tr><td colspan="7" class="text-center">Nenhuma compra registada.</td></tr>'}</tbody>
             </table>`;
+    });
+}
+
+function deletePurchase(purchaseId) {
+    const purchaseRef = database.ref('compras/' + purchaseId);
+    purchaseRef.once('value', snapshot => {
+        const purchase = snapshot.val();
+        if (!purchase) return;
+
+        if (purchase.status === 'Recebido') {
+            alert('Não é possível excluir uma compra que já foi recebida e teve o estoque atualizado.');
+            return;
+        }
+
+        if (confirm(`Tem a certeza de que deseja excluir a compra da NF #${purchase.numeroNota}? Esta ação não pode ser desfeita.`)) {
+            purchaseRef.remove()
+                .then(() => alert('Nota de compra excluída com sucesso!'))
+                .catch(error => alert('Erro ao excluir nota: ' + error.message));
+        }
     });
 }
 
@@ -824,9 +859,9 @@ function calculateDailySalesAndMonthlyRevenue() {
 function attachEventListeners() {
     // Navegação e Autenticação
     ui.authButton.addEventListener('click', handleAuthClick);
-    ui.nav.home.addEventListener('click', () => switchView('public'));
-    ui.nav.shop.addEventListener('click', () => switchView('public'));
-    ui.nav.dashboard.addEventListener('click', () => switchView('management'));
+    ui.nav.home.addEventListener('click', (e) => { e.preventDefault(); switchView('public'); });
+    ui.nav.shop.addEventListener('click', (e) => { e.preventDefault(); switchView('public'); });
+    ui.nav.dashboard.addEventListener('click', (e) => { e.preventDefault(); switchView('management'); });
     ui.erp.tabs.forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
 
     // Delegação de Eventos para botões dinâmicos
@@ -843,6 +878,7 @@ function attachEventListeners() {
         else if (target.classList.contains('edit-supplier-button')) openEditSupplierModal(datasetId);
         else if (target.classList.contains('delete-supplier-button')) deleteSupplier(datasetId);
         else if (target.classList.contains('confirm-receipt-button')) confirmPurchaseReceipt(datasetId);
+        else if (target.classList.contains('delete-purchase-button')) deletePurchase(datasetId);
         else if (target.classList.contains('confirm-sale-button')) confirmSale(datasetId);
         else if (target.classList.contains('cancel-order-button')) cancelOrder(datasetId);
         else if (target.classList.contains('confirm-finance-button')) confirmFinanceTransaction(datasetId, target.dataset.type);
@@ -850,7 +886,7 @@ function attachEventListeners() {
     });
 
     // Modais
-    ui.nav.cart.addEventListener('click', () => toggleModal(ui.cart.modal, true));
+    ui.nav.cart.addEventListener('click', (e) => { e.preventDefault(); toggleModal(ui.cart.modal, true); });
     ui.cart.closeButton.addEventListener('click', () => toggleModal(ui.cart.modal, false));
     ui.cart.checkoutButton.addEventListener('click', () => {
         toggleModal(ui.cart.modal, false);
@@ -881,5 +917,6 @@ document.addEventListener('DOMContentLoaded', () => {
     querySelAll('.modal-backdrop').forEach(modal => modal.classList.add('hidden'));
     loadPublicProducts();
     attachEventListeners();
+    updateCartDisplay();
 });
 
