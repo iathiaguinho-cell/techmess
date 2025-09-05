@@ -33,7 +33,6 @@ let suppliers = {};
 let customers = {};
 let currentPurchaseItems = {};
 let currentSaleItems = {};
-let salesReportData = [];
 let isErpInitialized = false;
 let currentOrderToConfirm = null;
 
@@ -827,8 +826,7 @@ function cancelOrder(orderId) {
 }
 
 
-// --- MÓDULO: FORNECEDORES, COMPRAS, ETC. ---
-// (As funções de Fornecedores e Compras permanecem as mesmas de antes)
+// --- MÓDULO: FORNECEDORES E COMPRAS ---
 function saveSupplier() {
     const id = ui.erp.suppliers.idInput.value;
     const name = ui.erp.suppliers.nameInput.value.trim();
@@ -982,7 +980,7 @@ function loadPurchases() {
                 <td>${p.fornecedorNome}</td>
                 <td>R$ ${p.total.toFixed(2).replace('.',',')}</td>
                 <td>${p.formaPagamento}</td>
-                <td>${p.status}</td>
+                <td><span class="px-2 py-1 text-xs rounded-full ${p.status === 'Recebido' ? 'bg-green-700' : 'bg-yellow-700'}">${p.status}</span></td>
                 <td class="flex items-center">
                     ${p.status === 'Aguardando Recebimento' ? `<button class="confirm-receipt-button bg-green-600 text-white text-xs px-2 py-1 rounded" data-id="${id}">Receber</button>` : ''}
                     <button class="delete-purchase-button bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded ml-2" data-id="${id}">Excluir</button>
@@ -1019,24 +1017,28 @@ async function confirmPurchaseReceipt(purchaseId) {
     const purchaseRef = database.ref('compras/' + purchaseId);
     const purchaseSnapshot = await purchaseRef.once('value');
     const purchase = purchaseSnapshot.val();
-    if (purchase && confirm('Confirmar o recebimento desta compra? O estoque será atualizado.')) {
+    if (purchase && confirm('Confirmar o recebimento desta compra? O estoque será atualizado e uma conta a pagar será gerada.')) {
         const updates = {};
         for (const [itemId, item] of Object.entries(purchase.itens)) {
             updates[`/estoque/${itemId}/quantidade`] = firebase.database.ServerValue.increment(item.quantity);
         }
         await database.ref().update(updates);
 
-        await database.ref('fluxoDeCaixa').push({
-            tipo: 'Pagar',
-            descricao: `Compra NF #${purchase.numeroNota} - ${purchase.fornecedorNome}`,
-            valor: -purchase.total, // Pagamentos são negativos no fluxo de caixa
-            data: purchase.dataCompra
+        await database.ref('contasPagar').push({
+            compraId: purchaseId,
+            fornecedorId: purchase.fornecedorId,
+            fornecedorNome: purchase.fornecedorNome,
+            descricao: `Pagamento NF #${purchase.numeroNota}`,
+            valor: purchase.total,
+            dataVencimento: purchase.dataCompra, // Assumindo vencimento na data da compra por simplicidade
+            status: 'Pendente'
         });
         
         await purchaseRef.update({ status: 'Recebido' });
-        alert('Recebimento confirmado e estoque atualizado!');
+        alert('Recebimento confirmado, estoque atualizado e conta a pagar gerada!');
     }
 }
+
 
 // --- MÓDULO FINANCEIRO REFEITO ---
 function loadFinance() {
@@ -1050,8 +1052,8 @@ function loadFinance() {
                 <td>${acc.clienteNome}</td>
                 <td>${acc.descricao}</td>
                 <td class="text-green-400">+ R$ ${acc.valor.toFixed(2).replace('.',',')}</td>
-                <td>${acc.status}</td>
-                <td>${!isPaid ? `<button class="confirm-payment-button bg-green-600 text-white text-xs px-2 py-1 rounded" data-id="${id}" data-type="receber">Receber</button>` : `Recebido em ${new Date(acc.dataRecebimento).toLocaleDateString()}`}</td>
+                <td><span class="px-2 py-1 text-xs rounded-full ${isPaid ? 'bg-green-700' : 'bg-yellow-700'}">${acc.status}</span></td>
+                <td>${!isPaid ? `<button class="confirm-transaction-button bg-green-600 text-white text-xs px-2 py-1 rounded" data-id="${id}" data-type="receber">Receber</button>` : `Liquidado em ${new Date(acc.dataRecebimento).toLocaleDateString()}`}</td>
             </tr>`;
         }).join('');
         ui.erp.finance.accountsReceivable.innerHTML = `
@@ -1059,7 +1061,24 @@ function loadFinance() {
             <tbody>${tableBody || '<tr><td colspan="6" class="text-center">Nenhuma conta a receber.</td></tr>'}</tbody></table>`;
     });
 
-    ui.erp.finance.accountsPayable.innerHTML = `<p class="text-center">Módulo de contas a pagar em desenvolvimento.</p>`;
+    database.ref('contasPagar').orderByChild('dataVencimento').on('value', (snapshot) => {
+        const accounts = snapshot.val() || {};
+        const tableBody = Object.entries(accounts).map(([id, acc]) => {
+            const isPaid = acc.status === 'Paga';
+            return `
+            <tr>
+                <td>${new Date(acc.dataVencimento + 'T12:00:00Z').toLocaleDateString()}</td>
+                <td>${acc.fornecedorNome}</td>
+                <td>${acc.descricao}</td>
+                <td class="text-red-400">- R$ ${acc.valor.toFixed(2).replace('.',',')}</td>
+                <td><span class="px-2 py-1 text-xs rounded-full ${isPaid ? 'bg-green-700' : 'bg-yellow-700'}">${acc.status}</span></td>
+                <td>${!isPaid ? `<button class="confirm-transaction-button bg-blue-600 text-white text-xs px-2 py-1 rounded" data-id="${id}" data-type="pagar">Pagar</button>` : `Liquidado em ${new Date(acc.dataPagamento).toLocaleDateString()}`}</td>
+            </tr>`;
+        }).join('');
+        ui.erp.finance.accountsPayable.innerHTML = `
+            <table class="w-full text-sm"><thead><tr><th>Vencimento</th><th>Fornecedor</th><th>Descrição</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody>${tableBody || '<tr><td colspan="6" class="text-center">Nenhuma conta a pagar.</td></tr>'}</tbody></table>`;
+    });
 
     database.ref('fluxoDeCaixa').on('value', (snapshot) => {
         const transactions = snapshot.val() || {};
@@ -1070,33 +1089,39 @@ function loadFinance() {
     });
 }
 
-async function confirmPayment(accountId, type) {
-    const node = type === 'receber' ? 'contasReceber' : 'contasPagar';
+async function confirmTransaction(accountId, type) {
+    const isReceiving = type === 'receber';
+    const node = isReceiving ? 'contasReceber' : 'contasPagar';
+    const newStatus = isReceiving ? 'Recebido' : 'Paga';
+    const dateField = isReceiving ? 'dataRecebimento' : 'dataPagamento';
+    const confirmationText = isReceiving ? 'Recebimento' : 'Pagamento';
+    
     const accountRef = database.ref(`${node}/${accountId}`);
     const snapshot = await accountRef.once('value');
     const account = snapshot.val();
 
     if (!account || account.status !== 'Pendente') return;
     
-    if (confirm(`Confirmar recebimento de R$ ${account.valor.toFixed(2)}?`)) {
+    if (confirm(`Confirmar ${confirmationText} de R$ ${account.valor.toFixed(2)}?`)) {
         try {
             await accountRef.update({
-                status: 'Recebido',
-                dataRecebimento: new Date().toISOString()
+                status: newStatus,
+                [dateField]: new Date().toISOString()
             });
 
             await database.ref('fluxoDeCaixa').push({
-                descricao: `Recebimento: ${account.descricao}`,
-                valor: account.valor,
+                descricao: `${confirmationText}: ${account.descricao}`,
+                valor: isReceiving ? account.valor : -account.valor,
                 data: new Date().toISOString()
             });
 
-            alert('Recebimento confirmado e lançado no caixa!');
+            alert(`${confirmationText} confirmado e lançado no caixa!`);
         } catch (error) {
-            alert('Erro ao confirmar recebimento: ' + error.message);
+            alert(`Erro ao confirmar ${confirmationText}: ` + error.message);
         }
     }
 }
+
 
 // --- OUTRAS FUNÇÕES ---
 function updateLowStockAlerts() {
@@ -1148,7 +1173,8 @@ async function performSystemReset() {
         '/fornecedores': null,
         '/compras': null,
         '/fluxoDeCaixa': null,
-        '/contasReceber': null
+        '/contasReceber': null,
+        '/contasPagar': null,
     };
 
     try {
@@ -1191,7 +1217,7 @@ function attachEventListeners() {
         else if (target.classList.contains('delete-purchase-button')) deletePurchase(datasetId);
         else if (target.classList.contains('confirm-sale-button')) openPaymentConfirmationModal(datasetId);
         else if (target.classList.contains('cancel-order-button')) cancelOrder(datasetId);
-        else if (target.classList.contains('confirm-payment-button')) confirmPayment(datasetId, target.dataset.type);
+        else if (target.classList.contains('confirm-transaction-button')) confirmTransaction(datasetId, target.dataset.type);
         else if (target.classList.contains('remove-purchase-item-button')) removeItemFromPurchase(datasetId);
         else if (target.classList.contains('remove-sale-item-button')) removeItemFromSale(datasetId);
     });
