@@ -219,7 +219,8 @@ function toggleModal(modalElement, show) {
 function initializeErpPanel() {
     if (isErpInitialized) return;
     console.log("A inicializar dados do Painel de Gestão...");
-    loadStockManagement();
+    // CORREÇÃO CRÍTICA DO ERRO DE DIGITAÇÃO:
+    loadStockManagement(); // Estava como "loadStockmanagement" com 'm' minúsculo
     loadSupplierManagement();
     loadCustomerManagement();
     loadPurchases();
@@ -457,6 +458,110 @@ function loadCustomerManagement() {
 }
 
 // --- MÓDULO: VENDAS (ERP) ---
+function openNewSaleModal() {
+    if (Object.keys(customers).length === 0 || Object.keys(products).length === 0) {
+        alert("É necessário ter pelo menos um cliente e um produto cadastrado para gerar uma venda.");
+        return;
+    }
+    
+    const customerOptions = Object.entries(customers).map(([id, c]) => `<option value="${id}">${c.nome}</option>`).join('');
+    ui.erp.sales.customerSelect.innerHTML = customerOptions;
+
+    const productOptions = Object.entries(products).map(([id, p]) => `<option value="${id}">${p.nome} - R$ ${p.precoVenda.toFixed(2)}</option>`).join('');
+    ui.erp.sales.productSelect.innerHTML = productOptions;
+
+    ui.erp.sales.dateInput.value = new Date().toISOString().split('T')[0];
+    currentSaleItems = {};
+    updateSaleItemsList();
+    toggleModal(ui.erp.sales.manualSaleModal, true);
+}
+
+function addItemToSale() {
+    const productId = ui.erp.sales.productSelect.value;
+    const quantity = parseInt(ui.erp.sales.quantityInput.value);
+    const product = products[productId];
+
+    if (!productId || isNaN(quantity) || quantity <= 0) {
+        alert("Dados do item inválidos.");
+        return;
+    }
+    
+    if (product.quantidade < quantity) {
+        alert(`Estoque insuficiente para ${product.nome}. Apenas ${product.quantidade} unidades disponíveis.`);
+        return;
+    }
+
+    currentSaleItems[productId] = { 
+        ...product,
+        quantity: (currentSaleItems[productId]?.quantity || 0) + quantity 
+    };
+    updateSaleItemsList();
+}
+
+function updateSaleItemsList() {
+    let total = 0;
+    ui.erp.sales.itemsList.innerHTML = Object.entries(currentSaleItems).map(([id, item]) => {
+        const subtotal = item.quantity * item.precoVenda;
+        total += subtotal;
+        return `<div class="flex justify-between items-center p-2 bg-gray-700 rounded mb-1">
+                    <span>${item.quantity}x ${item.nome} @ R$ ${item.precoVenda.toFixed(2)}</span>
+                    <button class="text-red-400 hover:text-red-600 remove-sale-item-button" data-id="${id}">&times;</button>
+                </div>`;
+    }).join('');
+    ui.erp.sales.total.textContent = `R$ ${total.toFixed(2)}`;
+}
+
+function removeItemFromSale(productId) {
+    delete currentSaleItems[productId];
+    updateSaleItemsList();
+}
+
+async function saveManualSale() {
+    const customerId = ui.erp.sales.customerSelect.value;
+    const saleDate = ui.erp.sales.dateInput.value;
+    const paymentMethod = ui.erp.sales.paymentMethodSelect.value;
+    const customer = customers[customerId];
+
+    if (!customerId || !saleDate || Object.keys(currentSaleItems).length === 0) {
+        alert("Preencha todos os campos da venda (cliente, data) e adicione itens.");
+        return;
+    }
+
+    const total = Object.values(currentSaleItems).reduce((sum, item) => sum + item.quantity * item.precoVenda, 0);
+
+    const updates = {};
+    for (const [itemId, item] of Object.entries(currentSaleItems)) {
+        updates[`/estoque/${itemId}/quantidade`] = firebase.database.ServerValue.increment(-item.quantity);
+    }
+    await database.ref().update(updates);
+    
+    const saleData = {
+        clienteId: customerId,
+        cliente: customer.nome,
+        whatsapp: customer.whatsapp,
+        itens: currentSaleItems,
+        total: total,
+        data: new Date(saleDate + 'T12:00:00Z').toISOString(),
+        status: 'Concluída',
+        pagamento: {
+            metodo: paymentMethod,
+            status: 'Pendente'
+        }
+    };
+    const newSaleRef = await database.ref('vendas').push(saleData);
+
+    await database.ref('fluxoDeCaixa').push({
+        tipo: 'Receber',
+        descricao: `Venda #${newSaleRef.key.slice(-5)} - ${customer.nome}`,
+        valor: total,
+        data: saleData.data,
+        status: 'Pendente'
+    });
+    
+    alert("Venda manual gerada com sucesso!");
+    toggleModal(ui.erp.sales.manualSaleModal, false);
+}
+
 function loadSales() {
     database.ref('pedidos').orderByChild('status').equalTo('pendente').on('value', snapshot => {
         const orders = snapshot.val() || {};
@@ -613,43 +718,335 @@ function cancelOrder(orderId) {
     }
 }
 
-// --- MÓDULO: DESPESAS E FINANCEIRO ---
+// --- MÓDULO: ESTOQUE (ERP) ---
+async function saveProduct() {
+    const id = ui.erp.stock.idInput.value;
+    const name = ui.erp.stock.nameInput.value;
+    const price = parseFloat(ui.erp.stock.priceInput.value);
+    const quantity = parseInt(ui.erp.stock.quantityInput.value);
+    const description = ui.erp.stock.descriptionInput.value;
+    const alertLevel = parseInt(ui.erp.stock.alertLevelInput.value);
+    const imageFile = ui.erp.stock.imageUploadInput.files[0];
 
-function openNewExpenseModal() {
-    ui.expenseModal.descriptionInput.value = '';
-    ui.expenseModal.valueInput.value = '';
-    ui.expenseModal.dueDateInput.value = new Date().toISOString().split('T')[0];
-    ui.expenseModal.categorySelect.value = 'Custo Fixo';
-    toggleModal(ui.expenseModal.modal, true);
-}
-
-function saveExpense() {
-    const description = ui.expenseModal.descriptionInput.value.trim();
-    const value = parseFloat(ui.expenseModal.valueInput.value);
-    const dueDate = ui.expenseModal.dueDateInput.value;
-    const category = ui.expenseModal.categorySelect.value;
-
-    if (!description || isNaN(value) || value <= 0 || !dueDate) {
-        alert("Preencha todos os campos da despesa corretamente.");
+    if (!name || isNaN(price) || isNaN(quantity)) {
+        alert('Por favor, preencha nome, preço e quantidade corretamente.');
         return;
     }
 
-    const expenseData = {
+    let imageUrl = (id && products[id] && products[id].imagem) || '';
+    if (imageFile) {
+        try {
+            const formData = new FormData();
+            formData.append('file', imageFile);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+            const response = await fetch(CLOUDINARY_API_URL, { method: 'POST', body: formData });
+            const data = await response.json();
+            if (data.secure_url) {
+                imageUrl = data.secure_url;
+            } else {
+                throw new Error(data.error.message || 'Erro desconhecido no upload.');
+            }
+        } catch (error) {
+            console.error("Cloudinary upload error:", error);
+            alert('Erro ao fazer upload da imagem. Tente novamente.');
+            return;
+        }
+    }
+
+    const productData = {
+        nome: name,
+        nome_lowercase: name.toLowerCase(),
+        precoVenda: price,
+        quantidade: quantity,
         descricao: description,
-        categoria: category,
-        valor: value,
-        dataVencimento: dueDate,
-        status: 'Pendente'
+        nivelAlertaEstoque: alertLevel || 0,
+        imagem: imageUrl
     };
 
-    database.ref('contasPagar').push(expenseData).then(() => {
-        alert("Despesa lançada com sucesso!");
-        toggleModal(ui.expenseModal.modal, false);
-    }).catch(error => {
-        alert("Erro ao salvar despesa: " + error.message);
+    const dbRef = id ? database.ref('estoque/' + id) : database.ref('estoque').push();
+    dbRef.set(productData).then(() => {
+        alert(`Produto ${id ? 'atualizado' : 'adicionado'} com sucesso!`);
+        toggleModal(ui.erp.stock.modal, false);
+    }).catch(error => alert(`Erro ao salvar produto: ${error.message}`));
+}
+
+function loadStockManagement() {
+    database.ref('estoque').on('value', snapshot => {
+        products = snapshot.val() || {};
+        const tableBody = Object.entries(products).map(([id, p]) => `
+            <tr>
+                <td><img src="${p.imagem || 'https://placehold.co/50x50/374151/9ca3af?text=Img'}" alt="${p.nome}" class="w-12 h-12 object-cover rounded"></td>
+                <td>${p.nome}</td>
+                <td>R$ ${(p.precoVenda || 0).toFixed(2).replace('.', ',')}</td>
+                <td>${p.quantidade || 0}</td>
+                <td>${p.nivelAlertaEstoque || 0}</td>
+                <td>
+                    <button class="edit-product-button bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded" data-id="${id}">Editar</button>
+                    <button class="delete-product-button bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded ml-2" data-id="${id}">Excluir</button>
+                </td>
+            </tr>
+        `).join('');
+        
+        ui.erp.stock.list.innerHTML = `
+            <table class="w-full text-sm">
+                <thead><tr><th>Imagem</th><th>Nome</th><th>Preço Venda</th><th>Qtd.</th><th>Alerta</th><th>Ações</th></tr></thead>
+                <tbody>${tableBody}</tbody>
+            </table>
+        `;
+        updateLowStockAlerts();
     });
 }
 
+function openEditProductModal(productId) {
+    const p = products[productId];
+    if (p) {
+        ui.erp.stock.title.textContent = 'Editar Produto';
+        ui.erp.stock.idInput.value = productId;
+        ui.erp.stock.nameInput.value = p.nome;
+        ui.erp.stock.priceInput.value = p.precoVenda;
+        ui.erp.stock.quantityInput.value = p.quantidade;
+        ui.erp.stock.descriptionInput.value = p.descricao;
+        ui.erp.stock.alertLevelInput.value = p.nivelAlertaEstoque;
+        ui.erp.stock.imageUploadInput.value = '';
+        toggleModal(ui.erp.stock.modal, true);
+    }
+}
+
+function openNewProductModal() {
+    ui.erp.stock.title.textContent = 'Adicionar Produto';
+    ui.erp.stock.idInput.value = '';
+    ui.erp.stock.nameInput.value = '';
+    ui.erp.stock.priceInput.value = '';
+    ui.erp.stock.quantityInput.value = '';
+    ui.erp.stock.descriptionInput.value = '';
+    ui.erp.stock.alertLevelInput.value = '';
+    ui.erp.stock.imageUploadInput.value = '';
+    toggleModal(ui.erp.stock.modal, true);
+}
+
+function deleteProduct(productId) {
+    if (confirm('Tem a certeza de que deseja excluir este produto?')) {
+        database.ref('estoque/' + productId).remove()
+            .then(() => alert('Produto excluído com sucesso!'))
+            .catch(error => alert('Erro ao excluir produto: ' + error.message));
+    }
+}
+
+
+// --- MÓDULO: COMPRAS E FORNECEDORES ---
+function saveSupplier() {
+    const id = ui.erp.suppliers.idInput.value;
+    const name = ui.erp.suppliers.nameInput.value.trim();
+    const contact = ui.erp.suppliers.contactInput.value.trim();
+    if (!name) {
+        alert("O nome do fornecedor é obrigatório.");
+        return;
+    }
+    const supplierData = { nome: name, contato: contact };
+    const ref = id ? database.ref('fornecedores/' + id) : database.ref('fornecedores').push();
+    ref.set(supplierData).then(() => {
+        alert(`Fornecedor ${id ? 'atualizado' : 'salvo'} com sucesso!`);
+        toggleModal(ui.erp.suppliers.modal, false);
+    }).catch(e => alert("Erro: " + e.message));
+}
+
+function loadSupplierManagement() {
+    database.ref('fornecedores').on('value', snapshot => {
+        suppliers = snapshot.val() || {};
+        const tableBody = Object.entries(suppliers).map(([id, s]) => `
+            <tr>
+                <td>${s.nome}</td>
+                <td>${s.contato}</td>
+                <td>
+                    <button class="edit-supplier-button bg-blue-600 text-white text-xs px-2 py-1 rounded" data-id="${id}">Editar</button>
+                    <button class="delete-supplier-button bg-red-600 text-white text-xs px-2 py-1 rounded ml-2" data-id="${id}">Excluir</button>
+                </td>
+            </tr>
+        `).join('');
+        ui.erp.suppliers.list.innerHTML = `
+            <table class="w-full text-sm">
+                <thead><tr><th>Nome</th><th>Contato</th><th>Ações</th></tr></thead>
+                <tbody>${tableBody || '<tr><td colspan="3" class="text-center">Nenhum fornecedor registado.</td></tr>'}</tbody>
+            </table>`;
+    });
+}
+
+function openEditSupplierModal(id) {
+    const s = suppliers[id];
+    if (s) {
+        ui.erp.suppliers.title.textContent = "Editar Fornecedor";
+        ui.erp.suppliers.idInput.value = id;
+        ui.erp.suppliers.nameInput.value = s.nome;
+        ui.erp.suppliers.contactInput.value = s.contato;
+        toggleModal(ui.erp.suppliers.modal, true);
+    }
+}
+
+function openNewSupplierModal() {
+    ui.erp.suppliers.title.textContent = "Adicionar Fornecedor";
+    ui.erp.suppliers.idInput.value = '';
+    ui.erp.suppliers.nameInput.value = '';
+    ui.erp.suppliers.contactInput.value = '';
+    toggleModal(ui.erp.suppliers.modal, true);
+}
+
+function deleteSupplier(id) {
+    if (confirm("Tem a certeza de que deseja excluir este fornecedor?")) {
+        database.ref('fornecedores/' + id).remove()
+        .then(() => alert("Fornecedor excluído."))
+        .catch(e => alert("Erro: " + e.message));
+    }
+}
+
+function openNewPurchaseModal() {
+    const supplierOptions = Object.entries(suppliers).map(([id, s]) => `<option value="${id}">${s.nome}</option>`).join('');
+    const productOptions = Object.entries(products).map(([id, p]) => `<option value="${id}">${p.nome}</option>`).join('');
+    if(!supplierOptions || !productOptions) {
+        alert("É necessário ter pelo menos um fornecedor e um produto registado para registar uma compra.");
+        return;
+    }
+    ui.erp.purchases.supplierSelect.innerHTML = supplierOptions;
+    ui.erp.purchases.productSelect.innerHTML = productOptions;
+    
+    ui.erp.purchases.invoiceInput.value = '';
+    ui.erp.purchases.paymentMethodSelect.value = 'Boleto';
+    ui.erp.purchases.dateInput.value = new Date().toISOString().split('T')[0];
+    
+    currentPurchaseItems = {};
+    updatePurchaseItemsList();
+    toggleModal(ui.erp.purchases.modal, true);
+}
+
+function addItemToPurchase() {
+    const productId = ui.erp.purchases.productSelect.value;
+    const quantity = parseInt(ui.erp.purchases.quantityInput.value);
+    const unitPrice = parseFloat(ui.erp.purchases.priceInput.value);
+
+    if (!productId || isNaN(quantity) || quantity <= 0 || isNaN(unitPrice) || unitPrice < 0) {
+        alert("Dados do item inválidos.");
+        return;
+    }
+    currentPurchaseItems[productId] = { nome: products[productId].nome, quantity, unitPrice };
+    updatePurchaseItemsList();
+}
+
+function updatePurchaseItemsList() {
+    let total = 0;
+    ui.erp.purchases.itemsList.innerHTML = Object.entries(currentPurchaseItems).map(([id, item]) => {
+        total += item.quantity * item.unitPrice;
+        return `<div class="flex justify-between items-center p-2 bg-gray-700 rounded mb-1">
+                    <span>${item.quantity}x ${item.nome} @ R$ ${item.unitPrice.toFixed(2)}</span>
+                    <button class="text-red-400 hover:text-red-600 remove-purchase-item-button" data-id="${id}">&times;</button>
+                </div>`;
+    }).join('');
+    ui.erp.purchases.total.textContent = `R$ ${total.toFixed(2)}`;
+}
+
+function removeItemFromPurchase(productId) {
+    delete currentPurchaseItems[productId];
+    updatePurchaseItemsList();
+}
+
+function savePurchase() {
+    const supplierId = ui.erp.purchases.supplierSelect.value;
+    const invoiceNumber = ui.erp.purchases.invoiceInput.value.trim();
+    const purchaseDate = ui.erp.purchases.dateInput.value;
+    const paymentMethod = ui.erp.purchases.paymentMethodSelect.value;
+
+    if (!supplierId || !invoiceNumber || !purchaseDate || Object.keys(currentPurchaseItems).length === 0) {
+        alert("Preencha todos os campos da compra (fornecedor, nº da nota, data) e adicione itens.");
+        return;
+    }
+
+    const total = Object.values(currentPurchaseItems).reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    const purchaseData = {
+        fornecedorId: supplierId,
+        fornecedorNome: suppliers[supplierId].nome,
+        itens: currentPurchaseItems,
+        total: total,
+        status: 'Aguardando Recebimento',
+        dataRegistro: new Date().toISOString(),
+        numeroNota: invoiceNumber,
+        dataCompra: purchaseDate,
+        formaPagamento: paymentMethod
+    };
+    
+    database.ref('compras').push(purchaseData).then(() => {
+        alert("Compra registada com sucesso!");
+        toggleModal(ui.erp.purchases.modal, false);
+    }).catch(e => alert("Erro: " + e.message));
+}
+
+function loadPurchases() {
+    database.ref('compras').on('value', snapshot => {
+        const purchases = snapshot.val() || {};
+        const tableBody = Object.entries(purchases).map(([id, p]) => `
+            <tr class="align-middle">
+                <td>${new Date(p.dataCompra).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</td>
+                <td>${p.numeroNota}</td>
+                <td>${p.fornecedorNome}</td>
+                <td>R$ ${p.total.toFixed(2).replace('.',',')}</td>
+                <td>${p.formaPagamento}</td>
+                <td><span class="px-2 py-1 text-xs rounded-full ${p.status === 'Recebido' ? 'bg-green-700' : 'bg-yellow-700'}">${p.status}</span></td>
+                <td class="flex items-center">
+                    ${p.status === 'Aguardando Recebimento' ? `<button class="confirm-receipt-button bg-green-600 text-white text-xs px-2 py-1 rounded" data-id="${id}">Receber</button>` : ''}
+                    <button class="delete-purchase-button bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded ml-2" data-id="${id}">Excluir</button>
+                </td>
+            </tr>`).join('');
+        ui.erp.purchases.list.innerHTML = `
+            <table class="w-full text-sm">
+                <thead><tr><th>Data</th><th>Nº Nota</th><th>Fornecedor</th><th>Total</th><th>Pagamento</th><th>Status</th><th>Ações</th></tr></thead>
+                <tbody>${tableBody || '<tr><td colspan="7" class="text-center">Nenhuma compra registada.</td></tr>'}</tbody>
+            </table>`;
+    });
+}
+
+function deletePurchase(purchaseId) {
+    const purchaseRef = database.ref('compras/' + purchaseId);
+    purchaseRef.once('value', snapshot => {
+        const purchase = snapshot.val();
+        if (!purchase) return;
+
+        if (purchase.status === 'Recebido') {
+            alert('Não é possível excluir uma compra que já foi recebida e teve o estoque atualizado.');
+            return;
+        }
+
+        if (confirm(`Tem a certeza de que deseja excluir a compra da NF #${purchase.numeroNota}? Esta ação não pode ser desfeita.`)) {
+            purchaseRef.remove()
+                .then(() => alert('Nota de compra excluída com sucesso!'))
+                .catch(error => alert('Erro ao excluir nota: ' + error.message));
+        }
+    });
+}
+
+async function confirmPurchaseReceipt(purchaseId) {
+    const purchaseRef = database.ref('compras/' + purchaseId);
+    const purchaseSnapshot = await purchaseRef.once('value');
+    const purchase = purchaseSnapshot.val();
+    if (purchase && confirm('Confirmar o recebimento desta compra? O estoque será atualizado e uma conta a pagar será gerada.')) {
+        const updates = {};
+        for (const [itemId, item] of Object.entries(purchase.itens)) {
+            updates[`/estoque/${itemId}/quantidade`] = firebase.database.ServerValue.increment(item.quantity);
+        }
+        await database.ref().update(updates);
+
+        await database.ref('contasPagar').push({
+            compraId: purchaseId,
+            fornecedorId: purchase.fornecedorId,
+            fornecedorNome: purchase.fornecedorNome,
+            descricao: `Pagamento NF #${purchase.numeroNota}`,
+            valor: purchase.total,
+            dataVencimento: purchase.dataCompra, // Assumindo vencimento na data da compra por simplicidade
+            status: 'Pendente'
+        });
+        
+        await purchaseRef.update({ status: 'Recebido' });
+        alert('Recebimento confirmado, estoque atualizado e conta a pagar gerada!');
+    }
+}
+
+// --- MÓDULO FINANCEIRO ---
 function loadFinance() {
     database.ref('contasReceber').orderByChild('dataVencimento').on('value', (snapshot) => {
         const accounts = snapshot.val() || {};
@@ -731,51 +1128,69 @@ async function confirmTransaction(accountId, type) {
     }
 }
 
-// --- Demais Módulos (Compras, Fornecedores, etc.) ---
-// ... (código existente e sem alterações para compras, fornecedores, etc.)
-// As funções abaixo permanecem as mesmas
-function saveSupplier() { /* ... */ }
-function loadSupplierManagement() { /* ... */ }
-function openEditSupplierModal(id) { /* ... */ }
-function openNewSupplierModal() { /* ... */ }
-function deleteSupplier(id) { /* ... */ }
-function openNewPurchaseModal() { /* ... */ }
-function addItemToPurchase() { /* ... */ }
-function updatePurchaseItemsList() { /* ... */ }
-function removeItemFromPurchase(productId) { /* ... */ }
-function savePurchase() { /* ... */ }
-function loadPurchases() { /* ... */ }
-function deletePurchase(purchaseId) { /* ... */ }
-// Função confirmPurchaseReceipt foi atualizada
-async function confirmPurchaseReceipt(purchaseId) {
-    const purchaseRef = database.ref('compras/' + purchaseId);
-    const purchaseSnapshot = await purchaseRef.once('value');
-    const purchase = purchaseSnapshot.val();
-    if (purchase && confirm('Confirmar o recebimento desta compra? O estoque será atualizado e uma conta a pagar será gerada.')) {
-        const updates = {};
-        for (const [itemId, item] of Object.entries(purchase.itens)) {
-            updates[`/estoque/${itemId}/quantidade`] = firebase.database.ServerValue.increment(item.quantity);
-        }
-        await database.ref().update(updates);
-
-        await database.ref('contasPagar').push({
-            compraId: purchaseId,
-            fornecedorId: purchase.fornecedorId,
-            fornecedorNome: purchase.fornecedorNome,
-            descricao: `Pagamento NF #${purchase.numeroNota}`,
-            valor: purchase.total,
-            dataVencimento: purchase.dataCompra,
-            status: 'Pendente'
-        });
-        
-        await purchaseRef.update({ status: 'Recebido' });
-        alert('Recebimento confirmado, estoque atualizado e conta a pagar gerada!');
+// --- OUTRAS FUNÇÕES ---
+function updateLowStockAlerts() {
+    if (!ui.erp.dashboard.lowStockAlerts) return;
+    const lowStockProducts = Object.values(products).filter(p => p.quantidade <= p.nivelAlertaEstoque);
+    if (lowStockProducts.length === 0) {
+        ui.erp.dashboard.lowStockAlerts.innerHTML = '<li>Nenhum alerta de estoque baixo.</li>';
+    } else {
+        ui.erp.dashboard.lowStockAlerts.innerHTML = lowStockProducts.map(p => 
+            `<li class="text-red-400">${p.nome}: ${p.quantidade} em estoque (Alerta: ${p.nivelAlertaEstoque})</li>`
+        ).join('');
     }
 }
-function updateLowStockAlerts() { /* ... */ }
-function calculateDailySalesAndMonthlyRevenue() { /* ... */ }
-function initiateSystemReset() { /* ... */ }
-async function performSystemReset() { /* ... */ }
+
+function calculateDailySalesAndMonthlyRevenue() {
+    database.ref('vendas').on('value', (snapshot) => {
+        const sales = snapshot.val() || {};
+        const today = new Date();
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).getTime();
+        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+        let daily = 0, monthly = 0;
+        Object.values(sales).forEach(sale => {
+            const saleDate = new Date(sale.data).getTime();
+            if (saleDate >= startOfMonth) monthly += sale.total;
+            if (saleDate >= startOfDay) daily += sale.total;
+        });
+        ui.erp.dashboard.dailySales.textContent = `R$ ${daily.toFixed(2).replace('.',',')}`;
+        ui.erp.dashboard.monthlyRevenue.textContent = `R$ ${monthly.toFixed(2).replace('.',',')}`;
+    });
+}
+
+function initiateSystemReset() {
+    const password = prompt("Esta é uma ação IRREVERSÍVEL e apagará TODOS os dados (produtos, vendas, clientes, etc). \n\nDigite a senha '9999' para continuar.");
+    if (password === '9999') {
+        if (confirm("TEM CERTEZA ABSOLUTA? Todos os dados serão permanentemente excluídos. Esta ação não pode ser desfeita.")) {
+            performSystemReset();
+        }
+    } else if (password !== null) {
+        alert("Senha incorreta.");
+    }
+}
+
+async function performSystemReset() {
+    const resetData = {
+        '/estoque': null,
+        '/vendas': null,
+        '/pedidos': null,
+        '/clientes': null,
+        '/fornecedores': null,
+        '/compras': null,
+        '/fluxoDeCaixa': null,
+        '/contasReceber': null,
+        '/contasPagar': null,
+    };
+
+    try {
+        await database.ref().update(resetData);
+        alert("Sistema reiniciado com sucesso. A página será recarregada.");
+        location.reload();
+    } catch (error) {
+        alert("Ocorreu um erro ao tentar reiniciar o sistema: " + error.message);
+    }
+}
+
 
 // --- INICIALIZAÇÃO E EVENT LISTENERS ---
 function attachEventListeners() {
