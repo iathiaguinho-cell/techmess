@@ -30,7 +30,9 @@ const database = firebase.database();
 let cart = {};
 let products = {};
 let suppliers = {};
+let customers = {};
 let currentPurchaseItems = {};
+let currentSaleItems = {};
 let salesReportData = [];
 let isErpInitialized = false;
 
@@ -67,6 +69,13 @@ const ui = {
         whatsappInput: getElem('customer-whatsapp'),
         submitButton: getElem('submit-checkout')
     },
+    paymentConfirmationModal: {
+        modal: getElem('payment-confirmation-modal'),
+        closeButton: getElem('close-payment-confirmation-modal'),
+        processButton: getElem('process-sale-confirmation-button'),
+        orderIdInput: getElem('confirm-sale-order-id'),
+        paymentMethodSelect: getElem('confirm-sale-payment-method')
+    },
     erp: {
         tabs: querySelAll('.tab-button'),
         contents: querySelAll('.tab-content'),
@@ -78,7 +87,34 @@ const ui = {
         },
         sales: {
             content: getElem('sales-content'),
-            pendingOrders: getElem('pending-orders')
+            pendingOrders: getElem('pending-orders'),
+            historyList: getElem('sales-history-list'),
+            newSaleButton: getElem('new-sale-button'),
+            manualSaleModal: getElem('manual-sale-modal'),
+            closeManualSaleModal: getElem('close-manual-sale-modal'),
+            saveManualSaleButton: getElem('save-manual-sale-button'),
+            customerSelect: getElem('sale-customer'),
+            productSelect: getElem('sale-product'),
+            quantityInput: getElem('sale-quantity'),
+            addItemButton: getElem('add-item-to-sale-button'),
+            itemsList: getElem('sale-items-list'),
+            total: getElem('sale-total'),
+            dateInput: getElem('sale-date'),
+            paymentMethodSelect: getElem('sale-payment-method')
+        },
+        customers: {
+            content: getElem('customers-content'),
+            addButton: getElem('add-customer-button'),
+            list: getElem('customer-list'),
+            modal: getElem('customer-form-modal'),
+            closeModalButton: getElem('close-customer-form-modal'),
+            saveButton: getElem('save-customer-button'),
+            title: getElem('customer-form-title'),
+            idInput: getElem('customer-id'),
+            nameInput: getElem('new-customer-name'),
+            whatsappInput: getElem('new-customer-whatsapp'),
+            emailInput: getElem('new-customer-email'),
+            notesInput: getElem('new-customer-notes')
         },
         purchases: {
             content: getElem('purchases-content'),
@@ -175,8 +211,10 @@ function initializeErpPanel() {
     console.log("A inicializar dados do Painel de Gestão...");
     loadStockManagement();
     loadSupplierManagement();
+    loadCustomerManagement();
     loadPurchases();
     loadSales();
+    loadSalesHistory();
     loadFinance();
     calculateDailySalesAndMonthlyRevenue();
     isErpInitialized = true;
@@ -210,7 +248,6 @@ function handleAuthClick() {
 }
 
 // --- MÓDULO: VITRINE PÚBLICA (E-COMMERCE) ---
-
 function loadPublicProducts() {
     database.ref('estoque').on('value', snapshot => {
         products = snapshot.val() || {};
@@ -284,7 +321,7 @@ function updateCartDisplay() {
     }
 }
 
-function submitCheckout() {
+async function submitCheckout() {
     const name = ui.checkout.nameInput.value.trim();
     const whatsapp = ui.checkout.whatsappInput.value.trim();
 
@@ -293,7 +330,23 @@ function submitCheckout() {
         return;
     }
 
+    let customerId = null;
+    const customerQuery = await database.ref('clientes').orderByChild('whatsapp').equalTo(whatsapp).once('value');
+    if (customerQuery.exists()) {
+        customerId = Object.keys(customerQuery.val())[0];
+    } else {
+        const newCustomerData = {
+            nome: name,
+            nome_lowercase: name.toLowerCase(),
+            whatsapp: whatsapp,
+            dataCadastro: new Date().toISOString()
+        };
+        const newCustomerRef = await database.ref('clientes').push(newCustomerData);
+        customerId = newCustomerRef.key;
+    }
+
     const order = {
+        clienteId: customerId,
         cliente: name,
         whatsapp: whatsapp,
         itens: cart,
@@ -315,8 +368,198 @@ function submitCheckout() {
     });
 }
 
-// --- MÓDULO: ESTOQUE (ERP) ---
+// --- MÓDULO: CLIENTES (CRM) ---
 
+function openNewCustomerModal() {
+    ui.erp.customers.title.textContent = 'Adicionar Novo Cliente';
+    ui.erp.customers.idInput.value = '';
+    ui.erp.customers.nameInput.value = '';
+    ui.erp.customers.whatsappInput.value = '';
+    ui.erp.customers.emailInput.value = '';
+    ui.erp.customers.notesInput.value = '';
+    toggleModal(ui.erp.customers.modal, true);
+}
+
+function openEditCustomerModal(customerId) {
+    const customer = customers[customerId];
+    if (customer) {
+        ui.erp.customers.title.textContent = 'Editar Cliente';
+        ui.erp.customers.idInput.value = customerId;
+        ui.erp.customers.nameInput.value = customer.nome;
+        ui.erp.customers.whatsappInput.value = customer.whatsapp;
+        ui.erp.customers.emailInput.value = customer.email || '';
+        ui.erp.customers.notesInput.value = customer.observacoes || '';
+        toggleModal(ui.erp.customers.modal, true);
+    }
+}
+
+function saveCustomer() {
+    const id = ui.erp.customers.idInput.value;
+    const name = ui.erp.customers.nameInput.value.trim();
+    const whatsapp = ui.erp.customers.whatsappInput.value.trim();
+    const email = ui.erp.customers.emailInput.value.trim();
+    const notes = ui.erp.customers.notesInput.value.trim();
+
+    if (!name || !whatsapp) {
+        alert('Nome e WhatsApp são obrigatórios.');
+        return;
+    }
+
+    const customerData = {
+        nome: name,
+        nome_lowercase: name.toLowerCase(),
+        whatsapp: whatsapp,
+        email: email,
+        observacoes: notes,
+        dataCadastro: new Date().toISOString()
+    };
+    
+    const dbRef = id ? database.ref('clientes/' + id) : database.ref('clientes').push();
+    dbRef.set(customerData).then(() => {
+        alert(`Cliente ${id ? 'atualizado' : 'salvo'} com sucesso!`);
+        toggleModal(ui.erp.customers.modal, false);
+    }).catch(error => alert(`Erro ao salvar cliente: ${error.message}`));
+}
+
+function deleteCustomer(customerId) {
+    if (confirm('Tem a certeza de que deseja excluir este cliente? Esta ação não pode ser desfeita.')) {
+        database.ref('clientes/' + customerId).remove()
+            .then(() => alert('Cliente excluído com sucesso!'))
+            .catch(error => alert('Erro ao excluir cliente: ' + error.message));
+    }
+}
+
+function loadCustomerManagement() {
+    database.ref('clientes').on('value', snapshot => {
+        customers = snapshot.val() || {};
+        const tableBody = Object.entries(customers).map(([id, c]) => `
+            <tr>
+                <td>${c.nome}</td>
+                <td>${c.whatsapp}</td>
+                <td>${c.email || 'N/A'}</td>
+                <td>
+                    <button class="edit-customer-button bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded" data-id="${id}">Editar</button>
+                    <button class="delete-customer-button bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded ml-2" data-id="${id}">Excluir</button>
+                </td>
+            </tr>
+        `).join('');
+
+        ui.erp.customers.list.innerHTML = `
+            <table class="w-full text-sm">
+                <thead><tr><th>Nome</th><th>WhatsApp</th><th>E-mail</th><th>Ações</th></tr></thead>
+                <tbody>${tableBody || '<tr><td colspan="4" class="text-center">Nenhum cliente cadastrado.</td></tr>'}</tbody>
+            </table>
+        `;
+    });
+}
+
+// --- MÓDULO: VENDA MANUAL (ERP) ---
+function openNewSaleModal() {
+    if (Object.keys(customers).length === 0 || Object.keys(products).length === 0) {
+        alert("É necessário ter pelo menos um cliente e um produto cadastrado para gerar uma venda.");
+        return;
+    }
+    
+    const customerOptions = Object.entries(customers).map(([id, c]) => `<option value="${id}">${c.nome}</option>`).join('');
+    ui.erp.sales.customerSelect.innerHTML = customerOptions;
+
+    const productOptions = Object.entries(products).map(([id, p]) => `<option value="${id}">${p.nome} - R$ ${p.precoVenda.toFixed(2)}</option>`).join('');
+    ui.erp.sales.productSelect.innerHTML = productOptions;
+
+    ui.erp.sales.dateInput.value = new Date().toISOString().split('T')[0];
+    currentSaleItems = {};
+    updateSaleItemsList();
+    toggleModal(ui.erp.sales.manualSaleModal, true);
+}
+
+function addItemToSale() {
+    const productId = ui.erp.sales.productSelect.value;
+    const quantity = parseInt(ui.erp.sales.quantityInput.value);
+    const product = products[productId];
+
+    if (!productId || isNaN(quantity) || quantity <= 0) {
+        alert("Dados do item inválidos.");
+        return;
+    }
+    
+    if (product.quantidade < quantity) {
+        alert(`Estoque insuficiente para ${product.nome}. Apenas ${product.quantidade} unidades disponíveis.`);
+        return;
+    }
+
+    currentSaleItems[productId] = { 
+        ...product,
+        quantity: (currentSaleItems[productId]?.quantity || 0) + quantity 
+    };
+    updateSaleItemsList();
+}
+
+function updateSaleItemsList() {
+    let total = 0;
+    ui.erp.sales.itemsList.innerHTML = Object.entries(currentSaleItems).map(([id, item]) => {
+        const subtotal = item.quantity * item.precoVenda;
+        total += subtotal;
+        return `<div class="flex justify-between items-center p-2 bg-gray-700 rounded mb-1">
+                    <span>${item.quantity}x ${item.nome} @ R$ ${item.precoVenda.toFixed(2)}</span>
+                    <button class="text-red-400 hover:text-red-600 remove-sale-item-button" data-id="${id}">&times;</button>
+                </div>`;
+    }).join('');
+    ui.erp.sales.total.textContent = `R$ ${total.toFixed(2)}`;
+}
+
+function removeItemFromSale(productId) {
+    delete currentSaleItems[productId];
+    updateSaleItemsList();
+}
+
+async function saveManualSale() {
+    const customerId = ui.erp.sales.customerSelect.value;
+    const saleDate = ui.erp.sales.dateInput.value;
+    const paymentMethod = ui.erp.sales.paymentMethodSelect.value;
+    const customer = customers[customerId];
+
+    if (!customerId || !saleDate || Object.keys(currentSaleItems).length === 0) {
+        alert("Preencha todos os campos da venda (cliente, data) e adicione itens.");
+        return;
+    }
+
+    const total = Object.values(currentSaleItems).reduce((sum, item) => sum + item.quantity * item.precoVenda, 0);
+
+    const updates = {};
+    for (const [itemId, item] of Object.entries(currentSaleItems)) {
+        updates[`/estoque/${itemId}/quantidade`] = firebase.database.ServerValue.increment(-item.quantity);
+    }
+    await database.ref().update(updates);
+    
+    const saleData = {
+        clienteId: customerId,
+        cliente: customer.nome,
+        whatsapp: customer.whatsapp,
+        itens: currentSaleItems,
+        total: total,
+        data: new Date(saleDate + 'T12:00:00Z').toISOString(),
+        status: 'Concluída',
+        pagamento: {
+            metodo: paymentMethod,
+            status: 'Pendente'
+        }
+    };
+    const newSaleRef = await database.ref('vendas').push(saleData);
+
+    await database.ref('fluxoDeCaixa').push({
+        tipo: 'Receber',
+        descricao: `Venda #${newSaleRef.key.slice(-5)} - ${customer.nome}`,
+        valor: total,
+        data: saleData.data,
+        status: 'Pendente'
+    });
+    
+    alert("Venda manual gerada com sucesso!");
+    toggleModal(ui.erp.sales.manualSaleModal, false);
+}
+
+
+// --- MÓDULO: ESTOQUE (ERP) ---
 async function saveProduct() {
     const id = ui.erp.stock.idInput.value;
     const name = ui.erp.stock.nameInput.value;
@@ -430,7 +673,146 @@ function deleteProduct(productId) {
     }
 }
 
-// --- MÓDULO: FORNECEDORES (ERP) ---
+
+// --- MÓDULO: VENDAS (ERP) ---
+function loadSales() {
+    database.ref('pedidos').orderByChild('status').equalTo('pendente').on('value', snapshot => {
+        const orders = snapshot.val() || {};
+        const tableBody = Object.entries(orders).map(([id, order]) => {
+            const itemsList = Object.values(order.itens).map(item => `${item.nome} (${item.quantity})`).join(', ');
+            return `
+                <tr>
+                    <td>${new Date(order.data).toLocaleDateString()}</td>
+                    <td>${order.cliente}</td>
+                    <td>${order.whatsapp}</td>
+                    <td class="text-xs">${itemsList}</td>
+                    <td>R$ ${order.total.toFixed(2)}</td>
+                    <td>
+                        <button class="confirm-sale-button bg-green-600 text-white text-xs px-2 py-1 rounded" data-id="${id}">Confirmar</button>
+                        <button class="cancel-order-button bg-red-600 text-white text-xs px-2 py-1 rounded ml-2" data-id="${id}">Cancelar</button>
+                    </td>
+                </tr>`;
+        }).join('');
+        
+        ui.erp.sales.pendingOrders.innerHTML = Object.keys(orders).length > 0 ? `
+            <table class="w-full text-sm">
+                <thead><tr><th>Data</th><th>Cliente</th><th>WhatsApp</th><th>Itens</th><th>Total</th><th>Ações</th></tr></thead>
+                <tbody>${tableBody}</tbody>
+            </table>` : '<p>Nenhum pedido pendente para confirmar.</p>';
+    });
+}
+
+function loadSalesHistory() {
+    database.ref('vendas').limitToLast(25).on('value', snapshot => {
+        const sales = snapshot.val() || {};
+        const reversedSales = Object.entries(sales).reverse();
+
+        if (reversedSales.length === 0) {
+            ui.erp.sales.historyList.innerHTML = '<p>Nenhuma venda foi confirmada ainda.</p>';
+            return;
+        }
+
+        const tableBody = reversedSales.map(([id, sale]) => {
+            const itemsList = Object.values(sale.itens).map(item => `${item.nome} (${item.quantity})`).join(', ');
+            return `
+                <tr>
+                    <td>${new Date(sale.data).toLocaleDateString()}</td>
+                    <td>${sale.cliente}</td>
+                    <td>${sale.whatsapp}</td>
+                    <td class="text-xs">${itemsList}</td>
+                    <td>R$ ${sale.total.toFixed(2)}</td>
+                </tr>`;
+        }).join('');
+        
+        ui.erp.sales.historyList.innerHTML = `
+            <table class="w-full text-sm">
+                <thead><tr><th>Data</th><th>Cliente</th><th>WhatsApp</th><th>Itens</th><th>Total</th></tr></thead>
+                <tbody>${tableBody}</tbody>
+            </table>`;
+    });
+}
+
+function openPaymentConfirmationModal(orderId) {
+    ui.paymentConfirmationModal.orderIdInput.value = orderId;
+    toggleModal(ui.paymentConfirmationModal.modal, true);
+}
+
+async function processSaleConfirmation() {
+    const orderId = ui.paymentConfirmationModal.orderIdInput.value;
+    const paymentMethod = ui.paymentConfirmationModal.paymentMethodSelect.value;
+    
+    if (!orderId || !paymentMethod) {
+        alert("Erro: ID do pedido ou método de pagamento não encontrado.");
+        return;
+    }
+
+    const orderRef = database.ref('pedidos/' + orderId);
+    const orderSnapshot = await orderRef.once('value');
+    const order = orderSnapshot.val();
+
+    if (!order) {
+        alert("Pedido não encontrado.");
+        toggleModal(ui.paymentConfirmationModal.modal, false);
+        return;
+    }
+    
+    const updates = {};
+    let hasEnoughStock = true;
+    const stockChecks = [];
+
+    for (const [itemId, item] of Object.entries(order.itens)) {
+        const check = database.ref('estoque/' + itemId).once('value').then(snapshot => {
+            const product = snapshot.val();
+            if (!product || product.quantidade < item.quantity) {
+                hasEnoughStock = false;
+                alert(`Estoque insuficiente para ${item.nome}. Venda não confirmada.`);
+            } else {
+                updates[`/estoque/${itemId}/quantidade`] = firebase.database.ServerValue.increment(-item.quantity);
+            }
+        });
+        stockChecks.push(check);
+    }
+    
+    await Promise.all(stockChecks);
+
+    if (!hasEnoughStock) {
+        toggleModal(ui.paymentConfirmationModal.modal, false);
+        return;
+    }
+
+    await database.ref().update(updates);
+    
+    order.pagamento = {
+        metodo: paymentMethod,
+        status: 'Pendente',
+    };
+
+    const newSaleRef = await database.ref('vendas').push(order);
+    const newSaleId = newSaleRef.key;
+
+    await database.ref('fluxoDeCaixa').push({
+        tipo: 'Receber',
+        descricao: `Venda #${newSaleId.slice(-5)} - ${order.cliente}`,
+        valor: order.total,
+        data: order.data,
+        status: 'Pendente',
+        metodo: paymentMethod
+    });
+
+    await orderRef.remove();
+    
+    alert('Venda confirmada e estoque atualizado!');
+    toggleModal(ui.paymentConfirmationModal.modal, false);
+}
+
+function cancelOrder(orderId) {
+    if (confirm('Tem a certeza de que deseja cancelar este pedido?')) {
+        database.ref('pedidos/' + orderId).remove().then(() => alert('Pedido cancelado!'));
+    }
+}
+
+
+// --- Restante do código (Fornecedores, Compras, Financeiro, etc.) ---
 function saveSupplier() {
     const id = ui.erp.suppliers.idInput.value;
     const name = ui.erp.suppliers.nameInput.value.trim();
@@ -496,7 +878,6 @@ function deleteSupplier(id) {
 }
 
 
-// --- MÓDULO: COMPRAS (ERP) ---
 function openNewPurchaseModal() {
     const supplierOptions = Object.entries(suppliers).map(([id, s]) => `<option value="${id}">${s.nome}</option>`).join('');
     const productOptions = Object.entries(products).map(([id, p]) => `<option value="${id}">${p.nome}</option>`).join('');
@@ -644,86 +1025,6 @@ async function confirmPurchaseReceipt(purchaseId) {
 }
 
 
-// --- MÓDULO: VENDAS (ERP) ---
-function loadSales() {
-    database.ref('pedidos').orderByChild('status').equalTo('pendente').on('value', snapshot => {
-        const orders = snapshot.val() || {};
-        const tableBody = Object.entries(orders).map(([id, order]) => {
-            const itemsList = Object.values(order.itens).map(item => `${item.nome} (${item.quantity})`).join(', ');
-            return `
-                <tr>
-                    <td>${new Date(order.data).toLocaleDateString()}</td>
-                    <td>${order.cliente}</td>
-                    <td>${order.whatsapp}</td>
-                    <td class="text-xs">${itemsList}</td>
-                    <td>R$ ${order.total.toFixed(2)}</td>
-                    <td>
-                        <button class="confirm-sale-button bg-green-600 text-white text-xs px-2 py-1 rounded" data-id="${id}">Confirmar</button>
-                        <button class="cancel-order-button bg-red-600 text-white text-xs px-2 py-1 rounded ml-2" data-id="${id}">Cancelar</button>
-                    </td>
-                </tr>`;
-        }).join('');
-        
-        ui.erp.sales.pendingOrders.innerHTML = Object.keys(orders).length > 0 ? `
-            <table class="w-full text-sm">
-                <thead><tr><th>Data</th><th>Cliente</th><th>WhatsApp</th><th>Itens</th><th>Total</th><th>Ações</th></tr></thead>
-                <tbody>${tableBody}</tbody>
-            </table>` : '<p>Nenhum pedido pendente.</p>';
-    });
-}
-
-async function confirmSale(orderId) {
-    const orderRef = database.ref('pedidos/' + orderId);
-    const orderSnapshot = await orderRef.once('value');
-    const order = orderSnapshot.val();
-
-    if (!order || !confirm('Confirmar esta venda? O estoque será atualizado.')) return;
-
-    const updates = {};
-    let hasEnoughStock = true;
-    const stockChecks = [];
-
-    for (const [itemId, item] of Object.entries(order.itens)) {
-        const check = database.ref('estoque/' + itemId).once('value').then(snapshot => {
-            const product = snapshot.val();
-            if (!product || product.quantidade < item.quantity) {
-                hasEnoughStock = false;
-                alert(`Estoque insuficiente para ${item.nome}. Venda não confirmada.`);
-            } else {
-                updates[`/estoque/${itemId}/quantidade`] = firebase.database.ServerValue.increment(-item.quantity);
-            }
-        });
-        stockChecks.push(check);
-    }
-    
-    await Promise.all(stockChecks);
-
-    if (!hasEnoughStock) {
-        return;
-    }
-
-    await database.ref().update(updates);
-    const newSaleRef = await database.ref('vendas').push(order);
-    const newSaleId = newSaleRef.key;
-    await database.ref('fluxoDeCaixa').push({
-        tipo: 'Receber',
-        descricao: `Venda #${newSaleId.slice(-5)} - ${order.cliente}`,
-        valor: order.total,
-        data: order.data,
-        status: 'Pendente'
-    });
-    await orderRef.remove();
-    alert('Venda confirmada e estoque atualizado!');
-}
-
-function cancelOrder(orderId) {
-    if (confirm('Tem a certeza de que deseja cancelar este pedido?')) {
-        database.ref('pedidos/' + orderId).remove().then(() => alert('Pedido cancelado!'));
-    }
-}
-
-
-// --- MÓDULO: FINANCEIRO (ERP) ---
 function loadFinance() {
     database.ref('fluxoDeCaixa').on('value', (snapshot) => {
         const transactions = snapshot.val() || {};
@@ -823,7 +1124,6 @@ function exportToCSV() {
 }
 
 
-// --- MÓDULO: DASHBOARD (ERP) ---
 function updateLowStockAlerts() {
     if (!ui.erp.dashboard.lowStockAlerts) return;
     const lowStockProducts = Object.values(products).filter(p => p.quantidade <= p.nivelAlertaEstoque);
@@ -877,12 +1177,15 @@ function attachEventListeners() {
         else if (target.classList.contains('delete-product-button')) deleteProduct(datasetId);
         else if (target.classList.contains('edit-supplier-button')) openEditSupplierModal(datasetId);
         else if (target.classList.contains('delete-supplier-button')) deleteSupplier(datasetId);
+        else if (target.classList.contains('edit-customer-button')) openEditCustomerModal(datasetId);
+        else if (target.classList.contains('delete-customer-button')) deleteCustomer(datasetId);
         else if (target.classList.contains('confirm-receipt-button')) confirmPurchaseReceipt(datasetId);
         else if (target.classList.contains('delete-purchase-button')) deletePurchase(datasetId);
-        else if (target.classList.contains('confirm-sale-button')) confirmSale(datasetId);
+        else if (target.classList.contains('confirm-sale-button')) openPaymentConfirmationModal(datasetId);
         else if (target.classList.contains('cancel-order-button')) cancelOrder(datasetId);
         else if (target.classList.contains('confirm-finance-button')) confirmFinanceTransaction(datasetId, target.dataset.type);
         else if (target.classList.contains('remove-purchase-item-button')) removeItemFromPurchase(datasetId);
+        else if (target.classList.contains('remove-sale-item-button')) removeItemFromSale(datasetId);
     });
 
     // Modais
@@ -894,6 +1197,8 @@ function attachEventListeners() {
     });
     ui.checkout.closeButton.addEventListener('click', () => toggleModal(ui.checkout.modal, false));
     ui.checkout.submitButton.addEventListener('click', submitCheckout);
+    ui.paymentConfirmationModal.closeButton.addEventListener('click', () => toggleModal(ui.paymentConfirmationModal.modal, false));
+    ui.paymentConfirmationModal.processButton.addEventListener('click', processSaleConfirmation);
 
     // Modais do ERP
     ui.erp.stock.addButton.addEventListener('click', openNewProductModal);
@@ -903,11 +1208,20 @@ function attachEventListeners() {
     ui.erp.suppliers.addButton.addEventListener('click', openNewSupplierModal);
     ui.erp.suppliers.closeModalButton.addEventListener('click', () => toggleModal(ui.erp.suppliers.modal, false));
     ui.erp.suppliers.saveButton.addEventListener('click', saveSupplier);
+
+    ui.erp.customers.addButton.addEventListener('click', openNewCustomerModal);
+    ui.erp.customers.closeModalButton.addEventListener('click', () => toggleModal(ui.erp.customers.modal, false));
+    ui.erp.customers.saveButton.addEventListener('click', saveCustomer);
     
     ui.erp.purchases.newButton.addEventListener('click', openNewPurchaseModal);
     ui.erp.purchases.closeModalButton.addEventListener('click', () => toggleModal(ui.erp.purchases.modal, false));
     ui.erp.purchases.addItemButton.addEventListener('click', addItemToPurchase);
     ui.erp.purchases.saveButton.addEventListener('click', savePurchase);
+    
+    ui.erp.sales.newSaleButton.addEventListener('click', openNewSaleModal);
+    ui.erp.sales.closeManualSaleModal.addEventListener('click', () => toggleModal(ui.erp.sales.manualSaleModal, false));
+    ui.erp.sales.addItemButton.addEventListener('click', addItemToSale);
+    ui.erp.sales.saveManualSaleButton.addEventListener('click', saveManualSale);
     
     ui.erp.finance.generateReportBtn.addEventListener('click', generateSalesReport);
     ui.erp.finance.exportCsvBtn.addEventListener('click', exportToCSV);
@@ -919,4 +1233,3 @@ document.addEventListener('DOMContentLoaded', () => {
     attachEventListeners();
     updateCartDisplay();
 });
-
