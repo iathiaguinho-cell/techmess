@@ -128,13 +128,183 @@
         </footer>
     </div>
 
-    <div id="cart-modal" class="modal-backdrop hidden"> ... </div>
-    <div id="checkout-modal" class="modal-backdrop hidden"> ... </div>
-    <div id="customer-form-modal" class="modal-backdrop hidden"> ... </div>
-    <div id="product-form-modal" class="modal-backdrop hidden"> ... </div>
-    <div id="supplier-form-modal" class="modal-backdrop hidden"> ... </div>
-    <div id="purchase-form-modal" class="modal-backdrop hidden"> ... </div>
-    <div id="manual-sale-modal" class="modal-backdrop hidden"> ... </div>
+    <div id="cart-modal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <h3 class="text-xl font-semibold mb-4">Seu Carrinho</h3>
+            <div id="cart-items" class="max-h-64 overflow-y-auto"></div>
+            <p class="text-lg font-bold mt-4">Total: <span id="cart-total">R$ 0,00</span></p>
+            <div class="mt-6 flex gap-4">
+                <button id="close-cart-modal" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Continuar Comprando</button>
+                <button id="checkout-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded" disabled>Finalizar Compra</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="checkout-modal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <h3 class="text-xl font-semibold mb-4">Informações para Checkout</h3>
+            <input type="text" id="customer-name" placeholder="Seu Nome Completo" class="form-input w-full mb-4">
+            <input type="text" id="customer-whatsapp" placeholder="Seu WhatsApp (Ex: 11999998888)" class="form-input w-full mb-4">
+            <div class="flex gap-4">
+                <button id="close-checkout-modal" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Cancelar</button>
+                <button id="submit-checkout" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded">Confirmar Pedido</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="customer-form-modal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <h3 class="text-xl font-semibold mb-4" id="customer-form-title">Adicionar Cliente</h3>
+            <input type="hidden" id="customer-id">
+            <input type="text" id="new-customer-name" placeholder="Nome do Cliente" class="form-input w-full mb-4">
+            <input type="text" id="new-customer-whatsapp" placeholder="WhatsApp (Ex: 11999998888)" class="form-input w-full mb-4">
+            <input type="email" id="new-customer-email" placeholder="E-mail (Opcional)" class="form-input w-full mb-4">
+            <textarea id="new-customer-notes" placeholder="Observações (Opcional)" class="form-input w-full mb-4"></textarea>
+            <div class="flex gap-4">
+                <button id="close-customer-form-modal" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Fechar</button>
+                <button id="save-customer-button" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded">Salvar Cliente</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="product-form-modal" class="modal-backdrop hidden">
+        <div class="modal-content md:w-1/2">
+            <h3 class="text-xl font-semibold mb-4" id="product-form-title">Adicionar Produto</h3>
+            <input type="hidden" id="product-id">
+            <input type="text" id="product-name" placeholder="Nome do Produto" class="form-input w-full mb-4">
+            <input type="number" id="product-price" placeholder="Preço de Venda" class="form-input w-full mb-4" step="0.01">
+            <input type="number" id="product-quantity" placeholder="Quantidade" class="form-input w-full mb-4">
+            <textarea id="product-description" placeholder="Descrição" class="form-input w-full mb-4"></textarea>
+            <input type="number" id="product-alert-level" placeholder="Nível de Alerta de Estoque" class="form-input w-full mb-4">
+            <input type="file" id="product-image-upload" accept="image/*" class="form-input w-full mb-4">
+            <div class="flex gap-4">
+                <button id="close-product-form-modal" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Fechar</button>
+                <button id="save-product-button" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded">Salvar Produto</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="supplier-form-modal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <h3 class="text-xl font-semibold mb-4" id="supplier-form-title">Adicionar Fornecedor</h3>
+            <input type="hidden" id="supplier-id">
+            <input type="text" id="supplier-name" placeholder="Nome do Fornecedor" class="form-input w-full mb-4">
+            <input type="text" id="supplier-contact" placeholder="Contato (Telefone, E-mail)" class="form-input w-full mb-4">
+            <div class="flex gap-4">
+                <button id="close-supplier-form-modal" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Fechar</button>
+                <button id="save-supplier-button" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded">Salvar Fornecedor</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="purchase-form-modal" class="modal-backdrop hidden">
+        <div class="modal-content lg:w-2/3">
+            <h3 class="text-xl font-semibold mb-4">Registrar Nova Compra</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label for="purchase-invoice-number" class="block text-sm font-medium text-gray-300 mb-1">Nº Nota Fiscal</label>
+                    <input type="text" id="purchase-invoice-number" placeholder="000123" class="form-input w-full">
+                </div>
+                <div>
+                    <label for="purchase-date" class="block text-sm font-medium text-gray-300 mb-1">Data da Compra</label>
+                    <input type="date" id="purchase-date" class="form-input w-full">
+                </div>
+                <div>
+                    <label for="purchase-payment-method" class="block text-sm font-medium text-gray-300 mb-1">Forma de Pagamento</label>
+                    <select id="purchase-payment-method" class="form-input w-full">
+                        <option>Boleto</option>
+                        <option>Cartão de Crédito</option>
+                        <option>Pix</option>
+                        <option>Dinheiro</option>
+                    </select>
+                </div>
+            </div>
+             <div class="mb-4">
+                <label for="purchase-supplier" class="block text-sm font-medium text-gray-300 mb-1">Fornecedor</label>
+                <select id="purchase-supplier" class="form-input w-full"></select>
+            </div>
+
+            <div class="border-t border-b border-gray-700 py-4 mb-4">
+                <h4 class="text-lg font-semibold mb-2">Adicionar Item</h4>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div class="md:col-span-2">
+                        <label for="purchase-product" class="block text-sm font-medium text-gray-300 mb-1">Produto</label>
+                        <select id="purchase-product" class="form-input w-full"></select>
+                    </div>
+                    <div>
+                        <label for="purchase-quantity" class="block text-sm font-medium text-gray-300 mb-1">Quantidade</label>
+                        <input type="number" id="purchase-quantity" class="form-input w-full" value="1" min="1">
+                    </div>
+                    <div>
+                        <label for="purchase-unit-price" class="block text-sm font-medium text-gray-300 mb-1">Custo Unit.</label>
+                        <input type="number" id="purchase-unit-price" class="form-input w-full" step="0.01" value="0" min="0">
+                    </div>
+                </div>
+                <button id="add-item-to-purchase-button" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Adicionar Item à Nota</button>
+            </div>
+
+            <h4 class="text-lg font-semibold mb-2">Itens na Nota</h4>
+            <div id="purchase-items-list" class="mb-4 max-h-48 overflow-y-auto"></div>
+            <p class="text-lg font-bold text-right mb-6">Total da Compra: <span id="purchase-total">R$ 0,00</span></p>
+            <div class="flex gap-4">
+                <button id="close-purchase-form-modal" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Fechar</button>
+                <button id="save-purchase-button" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded">Salvar Compra</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="manual-sale-modal" class="modal-backdrop hidden">
+        <div class="modal-content lg:w-2/3">
+            <h3 class="text-xl font-semibold mb-4">Gerar Nova Venda Manual</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="sale-customer" class="block text-sm font-medium text-gray-300 mb-1">Cliente</label>
+                    <select id="sale-customer" class="form-input w-full"></select>
+                </div>
+                 <div>
+                    <label for="sale-date" class="block text-sm font-medium text-gray-300 mb-1">Data da Venda</label>
+                    <input type="date" id="sale-date" class="form-input w-full">
+                </div>
+            </div>
+    
+            <div class="border-t border-b border-gray-700 py-4 mb-4">
+                <h4 class="text-lg font-semibold mb-2">Adicionar Produto</h4>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div class="md:col-span-3">
+                        <label for="sale-product" class="block text-sm font-medium text-gray-300 mb-1">Produto</label>
+                        <select id="sale-product" class="form-input w-full"></select>
+                    </div>
+                    <div>
+                        <label for="sale-quantity" class="block text-sm font-medium text-gray-300 mb-1">Quantidade</label>
+                        <input type="number" id="sale-quantity" class="form-input w-full" value="1" min="1">
+                    </div>
+                </div>
+                <button id="add-item-to-sale-button" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Adicionar Produto</button>
+            </div>
+    
+            <h4 class="text-lg font-semibold mb-2">Itens da Venda</h4>
+            <div id="sale-items-list" class="mb-4 max-h-48 overflow-y-auto"></div>
+            <p class="text-lg font-bold text-right mb-6">Total da Venda: <span id="sale-total">R$ 0,00</span></p>
+            
+            <div class="mb-4">
+                 <label for="sale-payment-method" class="block text-sm font-medium text-gray-300 mb-1">Forma de Pagamento</label>
+                <select id="sale-payment-method" class="form-input w-full">
+                    <option value="Pix">Pix</option>
+                    <option value="Boleto">Boleto</option>
+                    <option value="Cartão de Crédito">Cartão de Crédito</option>
+                    <option value="Carteira">Carteira</option>
+                    <option value="Depósito">Depósito</option>
+                </select>
+            </div>
+    
+            <div class="flex gap-4">
+                <button id="close-manual-sale-modal" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Fechar</button>
+                <button id="save-manual-sale-button" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded">Salvar Venda</button>
+            </div>
+        </div>
+    </div>
 
     <div id="payment-confirmation-modal" class="modal-backdrop hidden">
         <div class="modal-content">
@@ -169,7 +339,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="expense-form-modal" class="modal-backdrop hidden">
         <div class="modal-content">
             <h3 class="text-xl font-semibold mb-4">Lançar Nova Despesa</h3>
