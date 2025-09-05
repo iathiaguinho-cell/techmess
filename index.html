@@ -19,7 +19,7 @@
                     <li>
                         <a href="#" id="nav-cart" class="hover:text-cyan-400 relative flex items-center">
                             Carrinho
-                            <span id="cart-item-count" class="cart-badge">0</span>
+                            <span id="cart-item-count" class="cart-badge hidden">0</span>
                         </a>
                     </li>
                     <li class="hidden"><a href="#" id="nav-dashboard" class="hover:text-cyan-400">Dashboard</a></li>
@@ -32,8 +32,7 @@
             <section id="public-view">
                 <h2 class="text-3xl font-semibold mb-6 text-center">Nossos Produtos</h2>
                 <div id="product-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <!-- Products will be loaded here by JavaScript -->
-                </div>
+                    </div>
             </section>
 
             <section id="management-panel" class="hidden">
@@ -43,6 +42,7 @@
                         <li><button data-tab="sales" class="tab-button py-2 px-4 font-medium border-b-2 border-transparent text-gray-300 hover:text-white">Vendas</button></li>
                         <li><button data-tab="purchases" class="tab-button py-2 px-4 font-medium border-b-2 border-transparent text-gray-300 hover:text-white">Compras</button></li>
                         <li><button data-tab="stock" class="tab-button py-2 px-4 font-medium border-b-2 border-transparent text-gray-300 hover:text-white">Estoque</button></li>
+                        <li><button data-tab="customers" class="tab-button py-2 px-4 font-medium border-b-2 border-transparent text-gray-300 hover:text-white">Clientes</button></li>
                         <li><button data-tab="finance" class="tab-button py-2 px-4 font-medium border-b-2 border-transparent text-gray-300 hover:text-white">Financeiro</button></li>
                         <li><button data-tab="suppliers" class="tab-button py-2 px-4 font-medium border-b-2 border-transparent text-gray-300 hover:text-white">Fornecedores</button></li>
                     </ul>
@@ -61,8 +61,21 @@
                 </div>
 
                 <div id="sales-content" class="tab-content hidden">
-                    <h3 class="text-2xl font-semibold mb-4">Pedidos Pendentes</h3>
-                    <div id="pending-orders" class="overflow-x-auto"></div>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-2xl font-semibold">Pedidos Pendentes (Aguardando Confirmação)</h3>
+                        <button id="new-sale-button" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded">Gerar Venda</button>
+                    </div>
+                    <div id="pending-orders" class="overflow-x-auto bg-gray-800 p-4 rounded-lg shadow-lg"></div>
+                    <h3 class="text-2xl font-semibold mb-4 mt-8">Histórico de Vendas Confirmadas</h3>
+                    <div id="sales-history-list" class="overflow-x-auto bg-gray-800 p-4 rounded-lg shadow-lg"></div>
+                </div>
+                
+                <div id="customers-content" class="tab-content hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-2xl font-semibold">Gestão de Clientes</h3>
+                        <button id="add-customer-button" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded">Adicionar Cliente</button>
+                    </div>
+                    <div id="customer-list" class="overflow-x-auto"></div>
                 </div>
 
                 <div id="purchases-content" class="tab-content hidden">
@@ -121,7 +134,6 @@
         </footer>
     </div>
 
-    <!-- Modals -->
     <div id="cart-modal" class="modal-backdrop hidden">
         <div class="modal-content">
             <h3 class="text-xl font-semibold mb-4">Seu Carrinho</h3>
@@ -142,6 +154,21 @@
             <div class="flex gap-4">
                 <button id="close-checkout-modal" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Cancelar</button>
                 <button id="submit-checkout" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded">Confirmar Pedido</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="customer-form-modal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <h3 class="text-xl font-semibold mb-4" id="customer-form-title">Adicionar Cliente</h3>
+            <input type="hidden" id="customer-id">
+            <input type="text" id="new-customer-name" placeholder="Nome do Cliente" class="form-input w-full mb-4">
+            <input type="text" id="new-customer-whatsapp" placeholder="WhatsApp (Ex: 11999998888)" class="form-input w-full mb-4">
+            <input type="email" id="new-customer-email" placeholder="E-mail (Opcional)" class="form-input w-full mb-4">
+            <textarea id="new-customer-notes" placeholder="Observações (Opcional)" class="form-input w-full mb-4"></textarea>
+            <div class="flex gap-4">
+                <button id="close-customer-form-modal" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Fechar</button>
+                <button id="save-customer-button" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded">Salvar Cliente</button>
             </div>
         </div>
     </div>
@@ -233,6 +260,81 @@
         </div>
     </div>
     
+    <div id="manual-sale-modal" class="modal-backdrop hidden">
+        <div class="modal-content lg:w-2/3">
+            <h3 class="text-xl font-semibold mb-4">Gerar Nova Venda Manual</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="sale-customer" class="block text-sm font-medium text-gray-300 mb-1">Cliente</label>
+                    <select id="sale-customer" class="form-input w-full"></select>
+                </div>
+                 <div>
+                    <label for="sale-date" class="block text-sm font-medium text-gray-300 mb-1">Data da Venda</label>
+                    <input type="date" id="sale-date" class="form-input w-full">
+                </div>
+            </div>
+    
+            <div class="border-t border-b border-gray-700 py-4 mb-4">
+                <h4 class="text-lg font-semibold mb-2">Adicionar Produto</h4>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div class="md:col-span-3">
+                        <label for="sale-product" class="block text-sm font-medium text-gray-300 mb-1">Produto</label>
+                        <select id="sale-product" class="form-input w-full"></select>
+                    </div>
+                    <div>
+                        <label for="sale-quantity" class="block text-sm font-medium text-gray-300 mb-1">Quantidade</label>
+                        <input type="number" id="sale-quantity" class="form-input w-full" value="1" min="1">
+                    </div>
+                </div>
+                <button id="add-item-to-sale-button" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Adicionar Produto</button>
+            </div>
+    
+            <h4 class="text-lg font-semibold mb-2">Itens da Venda</h4>
+            <div id="sale-items-list" class="mb-4 max-h-48 overflow-y-auto"></div>
+            <p class="text-lg font-bold text-right mb-6">Total da Venda: <span id="sale-total">R$ 0,00</span></p>
+            
+            <div class="mb-4">
+                 <label for="sale-payment-method" class="block text-sm font-medium text-gray-300 mb-1">Forma de Pagamento</label>
+                <select id="sale-payment-method" class="form-input w-full">
+                    <option value="Pix">Pix</option>
+                    <option value="Boleto">Boleto</option>
+                    <option value="Cartão de Crédito">Cartão de Crédito</option>
+                    <option value="Carteira">Carteira</option>
+                    <option value="Depósito">Depósito</option>
+                </select>
+            </div>
+    
+            <div class="flex gap-4">
+                <button id="close-manual-sale-modal" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Fechar</button>
+                <button id="save-manual-sale-button" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded">Salvar Venda</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="payment-confirmation-modal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <h3 class="text-xl font-semibold mb-4">Confirmar Venda e Pagamento</h3>
+            <input type="hidden" id="confirm-sale-order-id">
+            
+            <div class="mb-4">
+                <label for="confirm-sale-payment-method" class="block text-sm font-medium text-gray-300 mb-1">Forma de Pagamento</label>
+                <select id="confirm-sale-payment-method" class="form-input w-full">
+                    <option value="Pix">Pix</option>
+                    <option value="Boleto">Boleto</option>
+                    <option value="Cartão de Crédito">Cartão de Crédito</option>
+                    <option value="Carteira">Carteira</option>
+                    <option value="Depósito">Depósito</option>
+                </select>
+            </div>
+            
+            <div class="flex gap-4">
+                <button id="close-payment-confirmation-modal" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Cancelar</button>
+                <button id="process-sale-confirmation-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Confirmar Venda</button>
+            </div>
+        </div>
+    </div>
+    
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
@@ -240,4 +342,3 @@
     <script src="./js/app.js"></script>
 </body>
 </html>
-
