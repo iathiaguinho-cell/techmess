@@ -188,4 +188,5 @@ tbody tr:hover {
     border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    ba
+    background: #6b7280;
+}
