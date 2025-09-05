@@ -128,6 +128,48 @@
         </footer>
     </div>
 
+    <div id="cart-modal" class="modal-backdrop hidden"> ... </div>
+    <div id="checkout-modal" class="modal-backdrop hidden"> ... </div>
+    <div id="customer-form-modal" class="modal-backdrop hidden"> ... </div>
+    <div id="product-form-modal" class="modal-backdrop hidden"> ... </div>
+    <div id="supplier-form-modal" class="modal-backdrop hidden"> ... </div>
+    <div id="purchase-form-modal" class="modal-backdrop hidden"> ... </div>
+    <div id="manual-sale-modal" class="modal-backdrop hidden"> ... </div>
+
+    <div id="payment-confirmation-modal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <h3 class="text-xl font-semibold mb-4">Confirmar Venda e Pagamento</h3>
+            <input type="hidden" id="confirm-sale-order-id">
+            
+            <div class="mb-4">
+                <label for="confirm-sale-payment-method" class="block text-sm font-medium text-gray-300 mb-1">Forma de Pagamento</label>
+                <select id="confirm-sale-payment-method" class="form-input w-full">
+                    <option value="Pix">Pix</option>
+                    <option value="Boleto">Boleto</option>
+                    <option value="Cartão de Crédito">Cartão de Crédito</option>
+                    <option value="Carteira">Carteira</option>
+                    <option value="Depósito">Depósito</option>
+                </select>
+            </div>
+
+            <div id="installment-fields" class="hidden grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="confirm-sale-installments" class="block text-sm font-medium text-gray-300 mb-1">Nº de Parcelas</label>
+                    <input type="number" id="confirm-sale-installments" class="form-input w-full" value="1" min="1">
+                </div>
+                <div>
+                    <label for="confirm-sale-first-due-date" class="block text-sm font-medium text-gray-300 mb-1">1º Vencimento</label>
+                    <input type="date" id="confirm-sale-first-due-date" class="form-input w-full">
+                </div>
+            </div>
+            
+            <div class="flex gap-4">
+                <button id="close-payment-confirmation-modal" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Cancelar</button>
+                <button id="process-sale-confirmation-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Confirmar Venda</button>
+            </div>
+        </div>
+    </div>
+    
     <div id="expense-form-modal" class="modal-backdrop hidden">
         <div class="modal-content">
             <h3 class="text-xl font-semibold mb-4">Lançar Nova Despesa</h3>
@@ -149,15 +191,6 @@
             </div>
         </div>
     </div>
-    
-    <div id="cart-modal" class="modal-backdrop hidden">...</div>
-    <div id="checkout-modal" class="modal-backdrop hidden">...</div>
-    <div id="payment-confirmation-modal" class="modal-backdrop hidden">...</div>
-    <div id="customer-form-modal" class="modal-backdrop hidden">...</div>
-    <div id="product-form-modal" class="modal-backdrop hidden">...</div>
-    <div id="supplier-form-modal" class="modal-backdrop hidden">...</div>
-    <div id="purchase-form-modal" class="modal-backdrop hidden">...</div>
-    <div id="manual-sale-modal" class="modal-backdrop hidden">...</div>
     
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
