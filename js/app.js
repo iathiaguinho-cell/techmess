@@ -33,7 +33,6 @@ let suppliers = {};
 let customers = {};
 let currentPurchaseItems = {};
 let currentSaleItems = {};
-let isErpInitialized = false;
 let currentOrderToConfirm = null;
 
 // --- SELETORES DE ELEMENTOS DO DOM (CACHE) ---
@@ -218,20 +217,6 @@ function toggleModal(modalElement, show) {
 
 // --- AUTENTICAÇÃO E INICIALIZAÇÃO DO PAINEL ---
 
-function initializeErpPanel() {
-    if (isErpInitialized) return;
-    console.log("A inicializar dados do Painel de Gestão...");
-    loadStockManagement(); // CORRIGIDO
-    loadSupplierManagement();
-    loadCustomerManagement();
-    loadPurchases();
-    loadSales();
-    loadSalesHistory();
-    loadFinance();
-    calculateDailySalesAndMonthlyRevenue();
-    isErpInitialized = true;
-}
-
 auth.onAuthStateChanged(user => {
     const isLoggedIn = !!user;
     ui.authButton.textContent = isLoggedIn ? 'Logout' : 'Login';
@@ -239,10 +224,19 @@ auth.onAuthStateChanged(user => {
     
     if (isLoggedIn) {
         switchView('management');
-        initializeErpPanel();
+        // CORREÇÃO: Carrega todos os dados sempre que o usuário estiver logado,
+        // garantindo a sincronização imediata.
+        console.log("Usuário autenticado. Carregando/sincronizando dados do painel...");
+        loadStockManagement(); 
+        loadSupplierManagement();
+        loadCustomerManagement();
+        loadPurchases();
+        loadSales();
+        loadSalesHistory();
+        loadFinance();
+        calculateDailySalesAndMonthlyRevenue();
     } else {
         switchView('public');
-        isErpInitialized = false;
     }
 });
 
@@ -260,6 +254,7 @@ function handleAuthClick() {
 }
 
 // --- MÓDULO: VITRINE PÚBLICA (E-COMMERCE) ---
+// (Sem alterações a partir daqui, o código permanece o mesmo da versão anterior e estável)
 function loadPublicProducts() {
     database.ref('estoque').on('value', snapshot => {
         products = snapshot.val() || {};
