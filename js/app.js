@@ -83,7 +83,8 @@ const ui = {
             content: getElem('dashboard-content'),
             monthlyRevenue: getElem('monthly-revenue'),
             dailySales: getElem('daily-sales'),
-            lowStockAlerts: getElem('low-stock-alerts')
+            lowStockAlerts: getElem('low-stock-alerts'),
+            resetSystemButton: getElem('reset-system-button')
         },
         sales: {
             content: getElem('sales-content'),
@@ -698,7 +699,7 @@ function loadSales() {
             <table class="w-full text-sm">
                 <thead><tr><th>Data</th><th>Cliente</th><th>WhatsApp</th><th>Itens</th><th>Total</th><th>Ações</th></tr></thead>
                 <tbody>${tableBody}</tbody>
-            </table>` : '<p>Nenhum pedido pendente para confirmar.</p>';
+            </table>` : '<p>Nenhum pedido pendente.</p>';
     });
 }
 
@@ -812,7 +813,7 @@ function cancelOrder(orderId) {
 }
 
 
-// --- Restante do código (Fornecedores, Compras, Financeiro, etc.) ---
+// --- MÓDULO: FORNECEDORES, COMPRAS, FINANCEIRO, ETC. ---
 function saveSupplier() {
     const id = ui.erp.suppliers.idInput.value;
     const name = ui.erp.suppliers.nameInput.value.trim();
@@ -1153,6 +1154,37 @@ function calculateDailySalesAndMonthlyRevenue() {
     });
 }
 
+function initiateSystemReset() {
+    const password = prompt("Esta é uma ação IRREVERSÍVEL e apagará TODOS os dados (produtos, vendas, clientes, etc). \n\nDigite a senha '9999' para continuar.");
+    if (password === '9999') {
+        if (confirm("TEM CERTEZA ABSOLUTA? Todos os dados serão permanentemente excluídos. Esta ação não pode ser desfeita.")) {
+            performSystemReset();
+        }
+    } else if (password !== null) {
+        alert("Senha incorreta.");
+    }
+}
+
+async function performSystemReset() {
+    const resetData = {
+        '/estoque': null,
+        '/vendas': null,
+        '/pedidos': null,
+        '/clientes': null,
+        '/fornecedores': null,
+        '/compras': null,
+        '/fluxoDeCaixa': null
+    };
+
+    try {
+        await database.ref().update(resetData);
+        alert("Sistema reiniciado com sucesso. A página será recarregada.");
+        location.reload();
+    } catch (error) {
+        alert("Ocorreu um erro ao tentar reiniciar o sistema: " + error.message);
+    }
+}
+
 
 // --- INICIALIZAÇÃO E EVENT LISTENERS ---
 
@@ -1163,6 +1195,7 @@ function attachEventListeners() {
     ui.nav.shop.addEventListener('click', (e) => { e.preventDefault(); switchView('public'); });
     ui.nav.dashboard.addEventListener('click', (e) => { e.preventDefault(); switchView('management'); });
     ui.erp.tabs.forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
+    ui.erp.dashboard.resetSystemButton.addEventListener('click', initiateSystemReset);
 
     // Delegação de Eventos para botões dinâmicos
     document.body.addEventListener('click', e => {
