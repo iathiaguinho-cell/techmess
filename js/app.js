@@ -219,8 +219,7 @@ function toggleModal(modalElement, show) {
 function initializeErpPanel() {
     if (isErpInitialized) return;
     console.log("A inicializar dados do Painel de Gestão...");
-    // CORREÇÃO CRÍTICA DO ERRO DE DIGITAÇÃO:
-    loadStockManagement(); // Estava como "loadStockmanagement" com 'm' minúsculo
+    loadStockManagement(); 
     loadSupplierManagement();
     loadCustomerManagement();
     loadPurchases();
@@ -1037,7 +1036,7 @@ async function confirmPurchaseReceipt(purchaseId) {
             fornecedorNome: purchase.fornecedorNome,
             descricao: `Pagamento NF #${purchase.numeroNota}`,
             valor: purchase.total,
-            dataVencimento: purchase.dataCompra, // Assumindo vencimento na data da compra por simplicidade
+            dataVencimento: purchase.dataCompra,
             status: 'Pendente'
         });
         
