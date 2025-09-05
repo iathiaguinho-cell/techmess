@@ -219,7 +219,7 @@ function toggleModal(modalElement, show) {
 function initializeErpPanel() {
     if (isErpInitialized) return;
     console.log("A inicializar dados do Painel de Gestão...");
-    loadStockManagement(); 
+    loadStockManagement(); // CORRIGIDO: 'Management' com 'M' maiúsculo
     loadSupplierManagement();
     loadCustomerManagement();
     loadPurchases();
@@ -830,7 +830,6 @@ function deleteProduct(productId) {
             .catch(error => alert('Erro ao excluir produto: ' + error.message));
     }
 }
-
 
 // --- MÓDULO: COMPRAS E FORNECEDORES ---
 function saveSupplier() {
