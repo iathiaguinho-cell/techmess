@@ -211,7 +211,9 @@ function switchTab(tabId) {
 }
 
 function toggleModal(modalElement, show) {
-    modalElement.classList.toggle('hidden', !show);
+    if (modalElement) {
+        modalElement.classList.toggle('hidden', !show);
+    }
 }
 
 // --- AUTENTICAÇÃO E INICIALIZAÇÃO DO PAINEL ---
@@ -219,7 +221,7 @@ function toggleModal(modalElement, show) {
 function initializeErpPanel() {
     if (isErpInitialized) return;
     console.log("A inicializar dados do Painel de Gestão...");
-    loadStockManagement(); // CORRIGIDO: 'Management' com 'M' maiúsculo
+    loadStockManagement(); // CORRIGIDO
     loadSupplierManagement();
     loadCustomerManagement();
     loadPurchases();
@@ -1045,6 +1047,41 @@ async function confirmPurchaseReceipt(purchaseId) {
 }
 
 // --- MÓDULO FINANCEIRO ---
+function openNewExpenseModal() {
+    ui.expenseModal.descriptionInput.value = '';
+    ui.expenseModal.valueInput.value = '';
+    ui.expenseModal.dueDateInput.value = new Date().toISOString().split('T')[0];
+    ui.expenseModal.categorySelect.value = 'Custo Fixo';
+    toggleModal(ui.expenseModal.modal, true);
+}
+
+function saveExpense() {
+    const description = ui.expenseModal.descriptionInput.value.trim();
+    const value = parseFloat(ui.expenseModal.valueInput.value);
+    const dueDate = ui.expenseModal.dueDateInput.value;
+    const category = ui.expenseModal.categorySelect.value;
+
+    if (!description || isNaN(value) || value <= 0 || !dueDate) {
+        alert("Preencha todos os campos da despesa corretamente.");
+        return;
+    }
+
+    const expenseData = {
+        descricao: description,
+        categoria: category,
+        valor: value,
+        dataVencimento: dueDate,
+        status: 'Pendente'
+    };
+
+    database.ref('contasPagar').push(expenseData).then(() => {
+        alert("Despesa lançada com sucesso!");
+        toggleModal(ui.expenseModal.modal, false);
+    }).catch(error => {
+        alert("Erro ao salvar despesa: " + error.message);
+    });
+}
+
 function loadFinance() {
     database.ref('contasReceber').orderByChild('dataVencimento').on('value', (snapshot) => {
         const accounts = snapshot.val() || {};
@@ -1259,7 +1296,7 @@ function attachEventListeners() {
     ui.erp.sales.closeManualSaleModal.addEventListener('click', () => toggleModal(ui.erp.sales.manualSaleModal, false));
     ui.erp.sales.addItemButton.addEventListener('click', addItemToSale);
     ui.erp.sales.saveManualSaleButton.addEventListener('click', saveManualSale);
-
+    
     ui.erp.finance.newExpenseButton.addEventListener('click', openNewExpenseModal);
     ui.expenseModal.closeButton.addEventListener('click', () => toggleModal(ui.expenseModal.modal, false));
     ui.expenseModal.saveButton.addEventListener('click', saveExpense);
